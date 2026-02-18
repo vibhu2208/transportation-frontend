@@ -10,7 +10,7 @@
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "deploy:dev": "chmod +x scripts/deploy.sh && ./scripts/deploy.sh development http://localhost:3001",
-    "deploy:prod": "chmod +x scripts/deploy.sh && ./scripts/deploy.sh production https://your-backend-render-url.onrender.com"
+    "deploy:prod": "chmod +x scripts/deploy.sh && ./scripts/deploy.sh production https://transporation-backend.onrender.com"
   },
   "dependencies": {
     "@headlessui/react": "^1.7.0",
