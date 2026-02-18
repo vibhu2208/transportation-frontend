@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import toast from 'react-hot-toast';
-import axios from 'axios';
+import { api } from '@/lib/api';
 
 const tripSchema = z.object({
   vehicleNumber: z.string().min(1, 'Vehicle number is required'),
@@ -69,7 +69,7 @@ export function TripCreationForm({ vendorId, onSuccess }: TripCreationFormProps)
         endTime: new Date(data.endTime).toISOString(),
       };
 
-      const response = await axios.post('http://localhost:3005/trips/create', tripData, {
+      const response = await api.post('/trips/create', tripData, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },

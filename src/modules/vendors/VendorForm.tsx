@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import toast from 'react-hot-toast';
-import axios from 'axios';
+import { api } from '@/lib/api';
 
 const vendorSchema = z.object({
   name: z.string().min(1, 'Vendor name is required'),
@@ -48,17 +48,15 @@ export function VendorForm({ vendor, onSave, onCancel }: VendorFormProps) {
 
       let response;
       if (vendor) {
-        response = await axios.patch(
-          `http://localhost:3005/vendors/${vendor.id}`,
-          data,
-          { headers }
+        response = await api.patch(
+          `/vendors/${vendor.id}`,
+          data
         );
         toast.success('Vendor updated successfully!');
       } else {
-        response = await axios.post(
-          'http://localhost:3005/vendors',
-          data,
-          { headers }
+        response = await api.post(
+          '/vendors',
+          data
         );
         
         // Show login credentials for new vendor

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { api } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { UserRole } from '@/types/auth';
@@ -33,14 +34,14 @@ export default function VendorDashboard() {
         const token = localStorage.getItem('auth_token');
         
         // Fetch vendor trips with limited fields
-        const tripsResponse = await fetch('http://localhost:3005/trips/vendor-view', {
+        const tripsResponse = await api.get('/trips/vendor-view', {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
         });
         
-        if (tripsResponse.ok) {
-          const trips = await tripsResponse.json();
+        if (tripsResponse.data) {
+          const trips = tripsResponse.data;
           setVendorTrips(trips);
           
           // Calculate stats from vendor trips

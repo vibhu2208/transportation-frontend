@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { api } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { UserRole } from '@/types/auth';
@@ -36,14 +37,14 @@ export default function AdminDashboard() {
         const token = localStorage.getItem('auth_token');
         
         // Fetch admin trips with all fields
-        const tripsResponse = await fetch('http://localhost:3005/trips/admin-view', {
+        const tripsResponse = await api.get('/trips/admin-view', {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
         });
         
-        if (tripsResponse.ok) {
-          const trips = await tripsResponse.json();
+        if (tripsResponse.data) {
+          const trips = tripsResponse.data;
           setAdminTrips(trips);
           
           // Calculate stats from admin trips

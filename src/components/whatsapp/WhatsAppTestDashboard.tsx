@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
-import axios from 'axios';
+import { api } from '@/lib/api';
 
 interface WhatsAppMessage {
   id: string;
@@ -24,7 +24,7 @@ export function WhatsAppTestDashboard() {
   // Fetch messages from backend
   const fetchMessages = async () => {
     try {
-      const response = await axios.get('http://localhost:3005/whatsapp/messages');
+      const response = await api.get('/whatsapp/messages');
       setMessages(response.data);
     } catch (error) {
       console.error('Error fetching messages:', error);
@@ -34,7 +34,7 @@ export function WhatsAppTestDashboard() {
   // Fetch test credentials from backend
   const fetchCredentials = async () => {
     try {
-      const response = await axios.get('http://localhost:3005/whatsapp/test-credentials');
+      const response = await api.get('/whatsapp/test-credentials');
       setTestCredentials(response.data);
     } catch (error) {
       console.error('Error fetching credentials:', error);
@@ -44,7 +44,7 @@ export function WhatsAppTestDashboard() {
   // Mark message as processed
   const markAsProcessedAPI = async (messageId: string) => {
     try {
-      await axios.patch(`http://localhost:3005/whatsapp/messages/${messageId}/process`, {});
+      await api.patch(`/whatsapp/messages/${messageId}/process`, {});
       markAsProcessed(messageId);
     } catch (error) {
       console.error('Error marking message as processed:', error);
@@ -54,7 +54,7 @@ export function WhatsAppTestDashboard() {
   // Clear messages on backend
   const clearMessagesAPI = async () => {
     try {
-      await axios.delete('http://localhost:3005/whatsapp/messages');
+      await api.delete('/whatsapp/messages');
       setMessages([]);
     } catch (error) {
       console.error('Error clearing messages:', error);
@@ -112,7 +112,7 @@ export function WhatsAppTestDashboard() {
     };
 
     try {
-      await axios.post('http://localhost:3005/whatsapp/simulate-message', testPayload);
+      await api.post('/whatsapp/simulate-message', testPayload);
       // Refresh messages after simulation
       fetchMessages();
     } catch (error) {

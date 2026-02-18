@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { VendorForm } from './VendorForm';
 import toast from 'react-hot-toast';
-import axios from 'axios';
+import { api } from '@/lib/api';
 
 interface Vendor {
   id: string;
@@ -39,14 +39,14 @@ export function VendorManagement({ onEdit }: VendorManagementProps) {
       const token = localStorage.getItem('auth_token');
       const headers = { Authorization: `Bearer ${token}` };
       
-      const response = await axios.get('http://localhost:3005/vendors', { headers });
+      const response = await api.get('/vendors');
       const vendors = response.data;
       
       // Fetch stats for each vendor
       const vendorsWithStats = await Promise.all(
         vendors.map(async (vendor: any) => {
           try {
-            const statsResponse = await axios.get(`http://localhost:3005/vendors/${vendor.id}/stats`, { headers });
+            const statsResponse = await api.get(`/vendors/${vendor.id}/stats`);
             return {
               ...vendor,
               totalTrips: statsResponse.data.totalTrips,
@@ -97,7 +97,7 @@ export function VendorManagement({ onEdit }: VendorManagementProps) {
       const token = localStorage.getItem('auth_token');
       const headers = { Authorization: `Bearer ${token}` };
       
-      await axios.delete(`http://localhost:3005/vendors/${vendorId}`, { headers });
+      await api.delete(`/vendors/${vendorId}`);
       toast.success('Vendor deleted successfully!');
       fetchVendors();
     } catch (error: any) {

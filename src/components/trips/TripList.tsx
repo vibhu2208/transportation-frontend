@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import toast from 'react-hot-toast';
-import axios from 'axios';
+import { api } from '@/lib/api';
 
 interface Trip {
   id: string;
@@ -46,7 +46,7 @@ export function TripList({ refreshTrigger }: TripListProps) {
   const fetchTrips = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await axios.get('http://localhost:3005/trips', {
+      const response = await api.get('/trips', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -70,7 +70,7 @@ export function TripList({ refreshTrigger }: TripListProps) {
     setDeletingId(tripId);
     try {
       const token = localStorage.getItem('auth_token');
-      await axios.delete(`http://localhost:3005/trips/${tripId}`, {
+      await api.delete(`/trips/${tripId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
