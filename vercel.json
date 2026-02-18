@@ -1,20 +1,12 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/next"
-    }
-  ],
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install",
   "env": {
     "NEXT_PUBLIC_API_URL": "@api_url",
     "NEXT_PUBLIC_ENV": "production",
     "NEXT_PUBLIC_APP_NAME": "Vendor Booking System",
     "NEXT_PUBLIC_APP_VERSION": "1.0.0"
-  },
-  "functions": {
-    "pages/api/**/*.js": {
-      "maxDuration": 30
-    }
   }
 }
