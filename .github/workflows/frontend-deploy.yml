@@ -1,0 +1,55 @@
+name: Frontend Deploy
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set tag + compose file
+        run: |
+          if [ "${GITHUB_REF##*/}" = "main" ]; then
+            echo "TAG=latest" >> $GITHUB_ENV
+            echo "COMPOSE=docker-compose.prod.yml" >> $GITHUB_ENV
+          else
+            echo "TAG=dev" >> $GITHUB_ENV
+            echo "COMPOSE=docker-compose.dev.yml" >> $GITHUB_ENV
+          fi
+
+      - name: Build & Push Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: adityasinghio/frontend:${{ env.TAG }}
+
+      - name: Deploy to EC2
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/key.pem
+          chmod 600 ~/.ssh/key.pem
+
+          ssh -o StrictHostKeyChecking=no \
+            -i ~/.ssh/key.pem \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << EOF
+              cd ~/app
+              docker compose -f ${{ env.COMPOSE }} pull frontend
+              docker compose -f ${{ env.COMPOSE }} up -d frontend
+              docker image prune -af
+          EOF
