@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { VehicleAutocomplete } from '@/components/ui/VehicleAutocomplete';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 
@@ -39,6 +40,7 @@ export function TripCreationForm({ vendorId, onSuccess }: TripCreationFormProps)
     handleSubmit,
     formState: { errors },
     reset,
+    control,
   } = useForm<TripFormData>({
     resolver: zodResolver(tripSchema),
   });
@@ -91,20 +93,30 @@ export function TripCreationForm({ vendorId, onSuccess }: TripCreationFormProps)
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Create New Trip</h3>
+    <div className="bg-white rounded-lg shadow-sm border border-border p-6">
+      <h3 className="text-lg font-semibold text-foreground mb-4">Create New Trip</h3>
       
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Vehicle Number
             </label>
-            <Input
-              {...register('vehicleNumber')}
-              placeholder="e.g., MH-01-AB-1234"
-              error={errors.vehicleNumber?.message}
+            <Controller
+              name="vehicleNumber"
+              control={control}
+              render={({ field }) => (
+                <VehicleAutocomplete
+                  value={field.value}
+                  onChange={field.onChange}
+                  placeholder="Search vehicle number..."
+                  required
+                />
+              )}
             />
+            {errors.vehicleNumber && (
+              <p className="mt-1 text-sm text-red-600">{errors.vehicleNumber.message}</p>
+            )}
           </div>
 
           <div>

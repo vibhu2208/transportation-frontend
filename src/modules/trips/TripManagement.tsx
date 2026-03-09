@@ -30,7 +30,7 @@ export function TripManagement() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900">Trip Management</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Trip Management</h1>
         <div className="flex items-center space-x-3">
           <Button onClick={handleCreateTrip}>
             <Plus className="mr-2 h-4 w-4" />
@@ -48,9 +48,9 @@ export function TripManagement() {
       </div>
 
       {/* Search and Filters */}
-      <div className="flex items-center space-x-4 bg-white p-4 rounded-lg shadow">
+      <div className="flex items-center space-x-4 bg-white p-4 rounded-lg shadow-sm border border-border">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search trips by vehicle number, driver, or location..."
             value={searchTerm}

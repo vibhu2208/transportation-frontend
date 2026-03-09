@@ -120,10 +120,10 @@ export function VendorManagement({ onEdit }: VendorManagementProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900">Vendor Management</h1>
+        <h2 className="text-2xl font-semibold text-foreground">Vendor Management</h2>
         <Button onClick={handleCreateVendor}>
           <Plus className="mr-2 h-4 w-4" />
-          New Vendor
+          Add Vendor
         </Button>
       </div>
 
@@ -132,8 +132,8 @@ export function VendorManagement({ onEdit }: VendorManagementProps) {
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-full items-center justify-center p-4">
             <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between p-6 border-b">
-                <h2 className="text-xl font-semibold">
+              <div className="flex items-center justify-between p-6 border-b border-border">
+                <h2 className="text-xl font-semibold text-foreground">
                   {selectedVendor ? 'Edit Vendor' : 'Create New Vendor'}
                 </h2>
                 <Button variant="ghost" onClick={handleCloseForm}>
@@ -152,107 +152,78 @@ export function VendorManagement({ onEdit }: VendorManagementProps) {
         </div>
       )}
 
-      {/* Vendors List */}
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Name
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Email
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Phone
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Address
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Trips
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Revenue
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {vendors.map((vendor) => (
-                <tr key={vendor.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{vendor.name}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center text-sm text-gray-900">
-                      <Mail className="h-4 w-4 mr-2" />
-                      {vendor.email}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center text-sm text-gray-900">
-                      <Phone className="h-4 w-4 mr-2" />
-                      {vendor.phone || '-'}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center text-sm text-gray-900">
-                      <MapPin className="h-4 w-4 mr-2" />
-                      {vendor.address || '-'}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      vendor.isActive 
-                        ? 'text-green-600 bg-green-50' 
-                        : 'text-red-600 bg-red-50'
-                    }`}>
-                      {vendor.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {vendor.totalTrips || 0}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${vendor.totalRevenue ? vendor.totalRevenue.toFixed(2) : '0.00'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditVendor(vendor)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(vendor.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        
-        {vendors.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500">No vendors found</p>
+      {/* Vendors Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {vendors.map((vendor) => (
+          <div key={vendor.id} className="bg-white rounded-lg shadow-sm border border-border p-6">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <h3 className="text-lg font-medium text-foreground">{vendor.name}</h3>
+                <p className="text-sm text-muted-foreground mt-1">{vendor.email}</p>
+                {vendor.phone && (
+                  <div className="flex items-center mt-2 text-sm text-muted-foreground">
+                    <Phone className="h-4 w-4 mr-1" />
+                    {vendor.phone}
+                  </div>
+                )}
+                {vendor.address && (
+                  <div className="flex items-center mt-1 text-sm text-muted-foreground">
+                    <MapPin className="h-4 w-4 mr-1" />
+                    {vendor.address}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleEditVendor(vendor)}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDelete(vendor.id)}
+                  className="text-destructive hover:text-red-700"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-border">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Total Trips</span>
+                  <div className="font-semibold text-primary">{vendor.totalTrips || 0}</div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Revenue</span>
+                  <div className="font-semibold text-primary">₹{(vendor.totalRevenue || 0).toLocaleString()}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 flex items-center">
+              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                vendor.isActive 
+                  ? 'bg-primary-100 text-primary-800' 
+                  : 'bg-red-100 text-red-800'
+              }`}>
+                {vendor.isActive ? 'Active' : 'Inactive'}
+              </span>
+            </div>
           </div>
-        )}
+        ))}
       </div>
+
+      {vendors.length === 0 && (
+        <div className="text-center py-12">
+          <div className="text-muted-foreground">No vendors found</div>
+          <p className="mt-2 text-sm text-muted-foreground">Create your first vendor to get started</p>
+        </div>
+      )}
     </div>
   );
 }

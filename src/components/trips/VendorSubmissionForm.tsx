@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { VehicleAutocomplete } from '@/components/ui/VehicleAutocomplete';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 
@@ -45,6 +46,7 @@ export function VendorSubmissionForm({ onSave, onCancel }: VendorSubmissionFormP
     handleSubmit,
     formState: { errors },
     reset,
+    control,
   } = useForm<VendorSubmissionData>({
     resolver: zodResolver(vendorSubmissionSchema),
     defaultValues: {
@@ -82,16 +84,16 @@ export function VendorSubmissionForm({ onSave, onCancel }: VendorSubmissionFormP
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-lg">
+    <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-sm border border-border">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Submit Trip Booking</h2>
-        <p className="text-gray-600">Enter the basic trip details. Operations and billing information will be added later by the admin team.</p>
+        <h2 className="text-2xl font-bold text-foreground mb-2">Submit Trip Booking</h2>
+        <p className="text-muted-foreground">Enter the basic trip details. Operations and billing information will be added later by the admin team.</p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Date *
             </label>
             <Input
@@ -102,7 +104,7 @@ export function VendorSubmissionForm({ onSave, onCancel }: VendorSubmissionFormP
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Party Name *
             </label>
             <Input
@@ -113,7 +115,7 @@ export function VendorSubmissionForm({ onSave, onCancel }: VendorSubmissionFormP
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               From Location *
             </label>
             <Input
@@ -124,7 +126,7 @@ export function VendorSubmissionForm({ onSave, onCancel }: VendorSubmissionFormP
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               To Location *
             </label>
             <Input
@@ -135,18 +137,28 @@ export function VendorSubmissionForm({ onSave, onCancel }: VendorSubmissionFormP
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Vehicle Number *
             </label>
-            <Input
-              {...register('vehicleNumber')}
-              error={errors.vehicleNumber?.message}
-              placeholder="Vehicle registration number"
+            <Controller
+              name="vehicleNumber"
+              control={control}
+              render={({ field }) => (
+                <VehicleAutocomplete
+                  value={field.value}
+                  onChange={field.onChange}
+                  placeholder="Search vehicle number..."
+                  required
+                />
+              )}
             />
+            {errors.vehicleNumber && (
+              <p className="mt-1 text-sm text-red-600">{errors.vehicleNumber.message}</p>
+            )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Initial Expense
             </label>
             <Input
@@ -159,7 +171,7 @@ export function VendorSubmissionForm({ onSave, onCancel }: VendorSubmissionFormP
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Advance
             </label>
             <Input
@@ -172,7 +184,7 @@ export function VendorSubmissionForm({ onSave, onCancel }: VendorSubmissionFormP
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Remarks
             </label>
             <textarea

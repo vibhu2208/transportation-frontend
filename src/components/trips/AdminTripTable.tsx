@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { api } from '@/lib/api';
 import { OperationsUpdateForm } from './OperationsUpdateForm';
 import { AccountsUpdateForm } from './AccountsUpdateForm';
 
@@ -35,6 +36,7 @@ interface AdminTripTableProps {
 export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
   const [selectedTrip, setSelectedTrip] = useState<string | null>(null);
   const [updateMode, setUpdateMode] = useState<'operations' | 'accounts' | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
 
   const handleOperationsUpdate = (tripId: string) => {
     setSelectedTrip(tripId);
@@ -69,6 +71,33 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
       case 'completed': return 'bg-green-100 text-green-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusDisplay = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'pending': return 'Pending';
+      case 'in_progress': return 'In Transit';
+      case 'completed': return 'Completed';
+      case 'cancelled': return 'Cancelled';
+      default: return status;
+    }
+  };
+
+  const handleStatusChange = async (tripId: string, newStatus: string) => {
+    setUpdatingStatus(tripId);
+    try {
+      const token = localStorage.getItem('auth_token');
+      await api.patch(`/trips/${tripId}`, { status: newStatus }, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      onRefresh();
+    } catch (error) {
+      console.error('Error updating status:', error);
+    } finally {
+      setUpdatingStatus(null);
     }
   };
 
@@ -196,9 +225,24 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                   </span>
                 </td>
                 <td className="px-2 py-3 whitespace-nowrap">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(trip.status)}`}>
-                    {trip.status}
-                  </span>
+                  {updatingStatus === trip.tripNo ? (
+                    <div className="flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                      <span className="text-xs text-gray-500">Updating...</span>
+                    </div>
+                  ) : (
+                    <select
+                      value={trip.status}
+                      onChange={(e) => handleStatusChange(trip.tripNo, e.target.value)}
+                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border-0 cursor-pointer focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 ${getStatusColor(trip.status)}`}
+                      disabled={updatingStatus !== null}
+                    >
+                      <option value="PENDING">Pending</option>
+                      <option value="IN_PROGRESS">In Transit</option>
+                      <option value="COMPLETED">Completed</option>
+                      <option value="CANCELLED">Cancelled</option>
+                    </select>
+                  )}
                 </td>
                 <td className="px-2 py-3 whitespace-nowrap text-sm font-medium">
                   <div className="flex space-x-1">

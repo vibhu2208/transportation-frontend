@@ -68,16 +68,16 @@ export default function VendorDashboard() {
 
   return (
     <ProtectedRoute allowedRoles={[UserRole.VENDOR]}>
-      <div className="min-h-screen bg-gray-50 p-6">
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-white p-6">
         <div className="max-w-7xl mx-auto">
           <div className="mb-8 flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Vendor Dashboard</h1>
-              <p className="text-gray-600 mt-2">Manage your trips and vehicles</p>
+              <h1 className="text-3xl font-bold text-foreground">Vendor Dashboard</h1>
+              <p className="text-muted-foreground mt-2">Manage your trips and vehicles</p>
             </div>
             <button
               onClick={handleLogout}
-              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+              className="bg-destructive text-destructive-foreground px-4 py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center gap-2 shadow-sm"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -87,34 +87,34 @@ export default function VendorDashboard() {
           </div>
 
           {/* Navigation Tabs */}
-          <div className="border-b border-gray-200 mb-8">
-            <nav className="-mb-px flex space-x-8">
+          <div className="border-b border-border bg-white rounded-t-lg shadow-sm mb-8">
+            <nav className="-mb-px flex space-x-8 px-6">
               <button
                 onClick={() => setActiveTab('overview')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === 'overview'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                 }`}
               >
                 Overview
               </button>
               <button
                 onClick={() => setActiveTab('create')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === 'create'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                 }`}
               >
                 Create Trip
               </button>
               <button
                 onClick={() => setActiveTab('manage')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === 'manage'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                 }`}
               >
                 My Trips
@@ -127,65 +127,102 @@ export default function VendorDashboard() {
             <>
               {/* Vendor Stats Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <div className="bg-white rounded-lg shadow p-6">
-                  <div className="text-sm font-medium text-gray-500">My Trips</div>
-                  <div className="text-3xl font-bold text-blue-600 mt-2">{stats.totalTrips}</div>
+                <div className="bg-white rounded-lg shadow-sm border border-border p-6">
+                  <div className="flex items-center">
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-muted-foreground">My Trips</div>
+                      <div className="text-3xl font-bold text-primary mt-2">{stats.totalTrips}</div>
+                    </div>
+                    <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
+                      <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                      </svg>
+                    </div>
+                  </div>
                 </div>
-                <div className="bg-white rounded-lg shadow p-6">
-                  <div className="text-sm font-medium text-gray-500">Active Vehicles</div>
-                  <div className="text-3xl font-bold text-green-600 mt-2">{stats.myVehicles}</div>
+                <div className="bg-white rounded-lg shadow-sm border border-border p-6">
+                  <div className="flex items-center">
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-muted-foreground">Active Vehicles</div>
+                      <div className="text-3xl font-bold text-primary mt-2">{stats.myVehicles}</div>
+                    </div>
+                    <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
+                      <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l2.414 2.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0M15 17a2 2 0 104 0" />
+                      </svg>
+                    </div>
+                  </div>
                 </div>
-                <div className="bg-white rounded-lg shadow p-6">
-                  <div className="text-sm font-medium text-gray-500">Pending</div>
-                  <div className="text-3xl font-bold text-orange-600 mt-2">{stats.pendingTrips}</div>
+                <div className="bg-white rounded-lg shadow-sm border border-border p-6">
+                  <div className="flex items-center">
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-muted-foreground">Pending</div>
+                      <div className="text-3xl font-bold text-orange-600 mt-2">{stats.pendingTrips}</div>
+                    </div>
+                    <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                      <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                  </div>
                 </div>
-                <div className="bg-white rounded-lg shadow p-6">
-                  <div className="text-sm font-medium text-gray-500">My Revenue</div>
-                  <div className="text-3xl font-bold text-yellow-600 mt-2">₹{stats.totalRevenue.toLocaleString()}</div>
+                <div className="bg-white rounded-lg shadow-sm border border-border p-6">
+                  <div className="flex items-center">
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-muted-foreground">Completed</div>
+                      <div className="text-3xl font-bold text-primary mt-2">{stats.completedTrips}</div>
+                    </div>
+                    <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
+                      <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Recent Trips and Quick Actions */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-4">Trip Overview</h2>
+                <div className="bg-white rounded-lg shadow-sm border border-border p-6">
+                  <h2 className="text-xl font-semibold text-foreground mb-4">Trip Overview</h2>
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Completed Trips</span>
-                      <span className="font-semibold text-green-600">{stats.completedTrips}</span>
+                      <span className="text-muted-foreground">Completed Trips</span>
+                      <span className="font-semibold text-primary">{stats.completedTrips}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Pending Trips</span>
+                      <span className="text-muted-foreground">Pending Trips</span>
                       <span className="font-semibold text-orange-600">{stats.pendingTrips}</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-secondary rounded-full h-2">
                       <div 
-                        className="bg-green-600 h-2 rounded-full" 
+                        className="bg-primary h-2 rounded-full transition-all duration-300" 
                         style={{ width: `${stats.totalTrips > 0 ? (stats.completedTrips / stats.totalTrips) * 100 : 0}%` }}
                       ></div>
                     </div>
-                    <div className="text-sm text-gray-500 text-center">
+                    <div className="text-sm text-muted-foreground text-center">
                       Completion Rate: {stats.totalTrips > 0 ? Math.round((stats.completedTrips / stats.totalTrips) * 100) : 0}%
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
+                <div className="bg-white rounded-lg shadow-sm border border-border p-6">
+                  <h2 className="text-xl font-semibold text-foreground mb-4">Quick Actions</h2>
                   <div className="space-y-3">
                     <button 
                       onClick={() => setActiveTab('create')}
-                      className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+                      className="w-full bg-primary text-primary-foreground py-2 px-4 rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
                     >
                       Create New Trip
                     </button>
                     <button 
                       onClick={() => setActiveTab('manage')}
-                      className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors"
+                      className="w-full bg-white text-foreground border border-border py-2 px-4 rounded-lg hover:bg-secondary transition-colors shadow-sm"
                     >
                       View My Trips
                     </button>
-                    <button className="w-full bg-orange-600 text-white py-2 px-4 rounded-lg hover:bg-orange-700 transition-colors">
+                    <button className="w-full bg-white text-foreground border border-border py-2 px-4 rounded-lg hover:bg-secondary transition-colors shadow-sm">
                       Manage Vehicles
                     </button>
                   </div>
