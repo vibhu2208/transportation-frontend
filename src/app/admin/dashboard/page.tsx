@@ -9,6 +9,7 @@ import { AdminTripTable } from '@/components/trips/AdminTripTable';
 import { VendorManagement } from '@/modules/vendors/VendorManagement';
 import { WhatsAppTestDashboard } from '@/components/whatsapp/WhatsAppTestDashboard';
 import { ExportButton } from '@/components/admin/ExportButton';
+import ShipperManagement from '@/components/admin/ShipperManagement';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -21,7 +22,7 @@ export default function AdminDashboard() {
     totalRevenue: 0,
   });
   const [adminTrips, setAdminTrips] = useState([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'manage' | 'vendors' | 'whatsapp'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'manage' | 'vendors' | 'shippers' | 'whatsapp'>('overview');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const router = useRouter();
 
@@ -96,7 +97,7 @@ export default function AdminDashboard() {
           {/* Navigation Tabs */}
           <div className="bg-white border border-gray-200 rounded-sm mb-8">
             <nav className="flex space-x-1 p-1">
-              {['overview', 'manage', 'vendors', 'whatsapp'].map((tab) => (
+              {['overview', 'manage', 'vendors', 'shippers', 'whatsapp'].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab as any)}
@@ -329,6 +330,10 @@ export default function AdminDashboard() {
 
           {activeTab === 'vendors' && (
             <VendorManagement onEdit={(vendor) => console.log('Edit vendor:', vendor)} />
+          )}
+
+          {activeTab === 'shippers' && (
+            <ShipperManagement />
           )}
 
           {activeTab === 'whatsapp' && (

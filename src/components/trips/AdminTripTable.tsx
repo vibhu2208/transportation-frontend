@@ -1,12 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { api } from '@/lib/api';
 import { OperationsUpdateForm } from './OperationsUpdateForm';
 import { AccountsUpdateForm } from './AccountsUpdateForm';
+import { goodsReceiptApi } from '@/lib/api-client';
+import { GoodsReceipt } from '@/types/goods-receipt';
 
 interface AdminTripData {
+  id: string;
   tripNo: string;
   date: string;
   vendorName: string;
@@ -37,6 +40,8 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
   const [selectedTrip, setSelectedTrip] = useState<string | null>(null);
   const [updateMode, setUpdateMode] = useState<'operations' | 'accounts' | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const [expandedTrip, setExpandedTrip] = useState<string | null>(null);
+  const [grData, setGrData] = useState<Record<string, GoodsReceipt[]>>({});
 
   const handleOperationsUpdate = (tripId: string) => {
     setSelectedTrip(tripId);
@@ -57,6 +62,25 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
   const handleCancel = () => {
     setSelectedTrip(null);
     setUpdateMode(null);
+  };
+
+  const toggleExpand = async (trip: AdminTripData) => {
+    if (expandedTrip === trip.tripNo) {
+      setExpandedTrip(null);
+    } else {
+      setExpandedTrip(trip.tripNo);
+      // Fetch GR data if not already loaded
+      if (!grData[trip.tripNo]) {
+        try {
+          console.log('Fetching GR data for trip:', trip.id, 'tripNo:', trip.tripNo);
+          const receipts = await goodsReceiptApi.getByTripId(trip.id);
+          console.log('GR receipts received:', receipts);
+          setGrData(prev => ({ ...prev, [trip.tripNo]: receipts }));
+        } catch (error) {
+          console.error('Error fetching GR data:', error);
+        }
+      }
+    }
   };
 
   const formatCurrency = (amount?: number) => {
@@ -173,7 +197,8 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {trips.map((trip) => (
-              <tr key={trip.tripNo} className="hover:bg-gray-50">
+              <React.Fragment key={trip.tripNo}>
+              <tr className="hover:bg-gray-50">
                 <td className="px-2 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                   {trip.tripNo}
                 </td>
@@ -264,9 +289,146 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                     >
                       Acc
                     </button>
+                    <button
+                      onClick={() => toggleExpand(trip)}
+                      className="text-purple-600 hover:text-purple-900 text-xs px-1"
+                      title="View GR Details"
+                    >
+                      {expandedTrip === trip.tripNo ? '▼' : '▶'} GR
+                    </button>
                   </div>
                 </td>
               </tr>
+              {expandedTrip === trip.tripNo && (
+                <tr key={`${trip.tripNo}-gr`}>
+                  <td colSpan={18} className="px-6 py-4 bg-gray-50">
+                    <div className="space-y-4">
+                      <h4 className="font-semibold text-gray-900 text-sm">Goods Receipt Details</h4>
+                      {grData[trip.tripNo] && grData[trip.tripNo].length > 0 ? (
+                        (() => {
+                          console.log('Rendering GR data for trip:', trip.tripNo, 'GR count:', grData[trip.tripNo].length);
+                          return grData[trip.tripNo].map((gr, index) => {
+                            console.log('Rendering GR:', gr.id, 'grBiltyImages:', gr.grBiltyImages);
+                            return (
+                              <div key={gr.id} className="bg-white p-4 rounded border border-gray-200">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                              <div>
+                                <span className="font-medium text-gray-600">Branch:</span>
+                                <p className="text-gray-900">{gr.branchName}</p>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-600">CN No:</span>
+                                <p className="text-gray-900">{gr.cnNo}</p>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-600">CN Date:</span>
+                                <p className="text-gray-900">{gr.cnDate}</p>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-600">Consignor:</span>
+                                <p className="text-gray-900">{gr.consignor}</p>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-600">Consignee:</span>
+                                <p className="text-gray-900">{gr.consigneeName}</p>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-600">Vehicle Type:</span>
+                                <p className="text-gray-900">{gr.vehicleType}</p>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-600">Package:</span>
+                                <p className="text-gray-900">{gr.package} {gr.typeOfPkg}</p>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-600">Goods:</span>
+                                <p className="text-gray-900">{gr.goodsDescription}</p>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-600">Freight:</span>
+                                <p className="text-gray-900">₹{gr.freight}</p>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-600">Total Freight:</span>
+                                <p className="text-gray-900">₹{gr.totalFreight || '-'}</p>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-600">GST:</span>
+                                <p className="text-gray-900">₹{gr.gst || '-'}</p>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-600">Net Payable:</span>
+                                <p className="text-gray-900 font-semibold">₹{gr.netPayable || '-'}</p>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-600">Actual WT:</span>
+                                <p className="text-gray-900">{gr.actualWt} {gr.unit}</p>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-600">Charged WT:</span>
+                                <p className="text-gray-900">{gr.chargedWt} {gr.unit}</p>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-600">GST Paid By:</span>
+                                <p className="text-gray-900">{gr.gstPaidBy}</p>
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-600">Account:</span>
+                                <p className="text-gray-900">{gr.account}</p>
+                              </div>
+                            </div>
+                            {gr.expenses && gr.expenses.length > 0 && (
+                              <div className="mt-4">
+                                <h5 className="font-medium text-gray-700 text-xs mb-2">Expenses:</h5>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                  {gr.expenses.map((exp: any, i: number) => (
+                                    <div key={i} className="text-xs bg-gray-50 p-2 rounded">
+                                      <span className="font-medium">{exp.expense}:</span> ₹{exp.amount}
+                                      {exp.narration && <span className="text-gray-600"> - {exp.narration}</span>}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {gr.grPhotoUrl && (
+                              <div className="mt-4">
+                                <a href={gr.grPhotoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 text-xs">
+                                  📷 View GR Photo
+                                </a>
+                              </div>
+                            )}
+                            {gr.grBiltyImages && Array.isArray(gr.grBiltyImages) && gr.grBiltyImages.length > 0 && (
+                              <div className="mt-4">
+                                <h5 className="font-medium text-gray-700 text-xs mb-2">GR/Bilty Images:</h5>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                  {gr.grBiltyImages.map((imageUrl: string, i: number) => (
+                                    <div key={i} className="relative group">
+                                      <img
+                                        src={imageUrl.startsWith('http') ? imageUrl : `${process.env.NEXT_PUBLIC_API_URL}${imageUrl}`}
+                                        alt={`GR/Bilty Image ${i + 1}`}
+                                        className="w-full h-20 object-cover rounded border cursor-pointer hover:opacity-75"
+                                        onClick={() => window.open(imageUrl.startsWith('http') ? imageUrl : `${process.env.NEXT_PUBLIC_API_URL}${imageUrl}`, '_blank')}
+                                      />
+                                      <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1 rounded-b opacity-0 group-hover:opacity-100 transition-opacity">
+                                        Image {i + 1}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                            );
+                          })
+                        })()
+                      ) : (
+                        <p className="text-gray-500 text-sm">No GR data available for this trip</p>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )}
+              </React.Fragment>
             ))}
           </tbody>
         </table>

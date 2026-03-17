@@ -28,6 +28,9 @@ export default function Home() {
           case UserRole.VENDOR:
             router.push('/vendor/dashboard');
             break;
+          case UserRole.SHIPPER:
+            router.push('/shipper/dashboard');
+            break;
           default:
             router.push('/dashboard');
             break;
@@ -56,6 +59,9 @@ export default function Home() {
           case UserRole.VENDOR:
             router.push('/vendor/dashboard');
             break;
+          case UserRole.SHIPPER:
+            router.push('/shipper/dashboard');
+            break;
           default:
             router.push('/dashboard');
             break;
@@ -78,104 +84,111 @@ export default function Home() {
 
   if (isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin h-16 w-16 border-4 border-gray-200 border-t-emerald-600 mx-auto mb-4"></div>
+          <p className="text-gray-700 font-black uppercase tracking-wide">REDIRECTING...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
-      {/* Background decoration */}
+    <div className="min-h-screen bg-white flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative">
+      {/* Background geometric pattern */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-200 rounded-full opacity-20 blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-200 rounded-full opacity-20 blur-3xl"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-100 rounded-full opacity-10 blur-3xl"></div>
+        <div className="absolute top-0 left-0 w-full h-full">
+          <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-b from-emerald-50 to-green-100"></div>
+          <div className="absolute bottom-0 left-0 w-1/4 h-2/3 bg-gradient-to-t from-emerald-50 to-transparent"></div>
+          <div className="absolute top-1/4 right-1/4 w-32 h-32 bg-emerald-500 opacity-5 transform rotate-45"></div>
+          <div className="absolute bottom-1/3 left-1/3 w-24 h-24 bg-green-600 opacity-5 transform rotate-12"></div>
+        </div>
       </div>
 
-      <div className="relative z-10 sm:mx-auto sm:w-full sm:max-w-md">
+      <div className="relative z-10 sm:mx-auto sm:w-full sm:max-w-lg">
         {/* Logo and branding */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-xl mb-4 transform hover:scale-105 transition-transform duration-300">
-            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+        <div className="flex flex-col items-center mb-10">
+          <div className="w-24 h-24 bg-emerald-600 flex items-center justify-center shadow-2xl mb-6 border-4 border-white">
+            <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
             </svg>
           </div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent text-center">
-            Transportation Management
+          <h1 className="text-4xl font-black text-gray-900 text-center tracking-tight">
+            TRANSPORT<span className="text-emerald-600">PRO</span>
           </h1>
-          <p className="mt-3 text-center text-gray-600 text-lg font-medium">
-            Professional Logistics & Fleet Management
+          <p className="mt-4 text-center text-gray-700 text-lg font-semibold uppercase tracking-wide">
+            Professional Fleet Management System
           </p>
-          <div className="mt-2 flex items-center justify-center space-x-2">
-            <div className="h-1 w-8 bg-blue-600 rounded-full"></div>
-            <div className="h-1 w-8 bg-indigo-600 rounded-full"></div>
-            <div className="h-1 w-8 bg-purple-600 rounded-full"></div>
+          <div className="mt-4 flex items-center justify-center space-x-1">
+            <div className="h-2 w-12 bg-emerald-600"></div>
+            <div className="h-2 w-12 bg-green-500"></div>
+            <div className="h-2 w-12 bg-emerald-400"></div>
           </div>
         </div>
 
         {/* Main login card */}
-        <div className="bg-white/80 backdrop-blur-xl py-8 px-8 shadow-2xl border border-white/20 rounded-2xl">
-          <div className="mb-6">
-            <h2 className="text-2xl font-semibold text-gray-900 text-center mb-2">
-              Welcome Back
+        <div className="bg-white py-10 px-10 shadow-2xl border-4 border-gray-200">
+          <div className="mb-8">
+            <div className="w-full h-1 bg-emerald-600 mb-6"></div>
+            <h2 className="text-3xl font-black text-gray-900 text-center mb-3 uppercase tracking-wide">
+              SECURE LOGIN
             </h2>
-            <p className="text-center text-gray-600">
-              Sign in to access your dashboard
+            <p className="text-center text-gray-700 font-semibold uppercase text-sm tracking-wider">
+              Enter your credentials to continue
             </p>
           </div>
           
           <LoginForm onLogin={handleLogin} />
           
           {/* Demo accounts section */}
-          <div className="mt-8 border-t border-gray-200 pt-6">
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-100">
-              <h3 className="font-semibold text-gray-900 mb-4 flex items-center text-lg">
-                <svg className="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <div className="mt-10 border-t-4 border-emerald-600 pt-8">
+            <div className="bg-gray-50 p-6 border-2 border-gray-200">
+              <h3 className="font-black text-gray-900 mb-6 flex items-center text-lg uppercase tracking-wide">
+                <svg className="w-6 h-6 text-emerald-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                Demo Accounts
+                DEMO ACCOUNTS
               </h3>
-              <div className="space-y-3">
-                <div className="bg-white rounded-lg p-3 border border-blue-200">
+              <div className="space-y-4">
+                <div className="bg-white p-4 border-2 border-emerald-200">
                   <div className="flex justify-between items-center">
                     <div>
-                      <span className="font-semibold text-gray-900 text-sm">Admin</span>
-                      <p className="text-xs text-gray-600">Full system access</p>
+                      <span className="font-black text-gray-900 text-sm uppercase">ADMIN</span>
+                      <p className="text-xs text-gray-600 font-semibold uppercase tracking-wide">FULL SYSTEM ACCESS</p>
                     </div>
-                    <code className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-mono">
+                    <code className="bg-emerald-100 text-emerald-800 px-3 py-2 text-xs font-mono font-bold border border-emerald-300">
                       admin@transport.com
                     </code>
                   </div>
                 </div>
-                <div className="bg-white rounded-lg p-3 border border-indigo-200">
+                <div className="bg-white p-4 border-2 border-green-200">
                   <div className="flex justify-between items-center">
                     <div>
-                      <span className="font-semibold text-gray-900 text-sm">Vendor 1</span>
-                      <p className="text-xs text-gray-600">Transport company</p>
+                      <span className="font-black text-gray-900 text-sm uppercase">VENDOR 1</span>
+                      <p className="text-xs text-gray-600 font-semibold uppercase tracking-wide">TRANSPORT COMPANY</p>
                     </div>
-                    <code className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-mono">
+                    <code className="bg-green-100 text-green-800 px-3 py-2 text-xs font-mono font-bold border border-green-300">
                       vendor1@transport.com
                     </code>
                   </div>
                 </div>
-                <div className="bg-white rounded-lg p-3 border border-purple-200">
+                <div className="bg-white p-4 border-2 border-emerald-300">
                   <div className="flex justify-between items-center">
                     <div>
-                      <span className="font-semibold text-gray-900 text-sm">Vendor 2</span>
-                      <p className="text-xs text-gray-600">Logistics provider</p>
+                      <span className="font-black text-gray-900 text-sm uppercase">VENDOR 2</span>
+                      <p className="text-xs text-gray-600 font-semibold uppercase tracking-wide">LOGISTICS PROVIDER</p>
                     </div>
-                    <code className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-mono">
+                    <code className="bg-emerald-50 text-emerald-800 px-3 py-2 text-xs font-mono font-bold border border-emerald-400">
                       vendor2@transport.com
                     </code>
                   </div>
                 </div>
-                <div className="mt-4 pt-3 border-t border-blue-200 text-center">
-                  <div className="flex items-center justify-center space-x-2 text-sm text-gray-700">
-                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                <div className="mt-6 pt-4 border-t-2 border-emerald-600 text-center">
+                  <div className="flex items-center justify-center space-x-3 text-sm text-gray-800">
+                    <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
-                    <span className="font-mono bg-gray-100 px-2 py-1 rounded">password123</span>
+                    <span className="font-mono bg-emerald-100 px-4 py-2 font-bold border-2 border-emerald-300 text-emerald-800">password123</span>
                   </div>
                 </div>
               </div>
@@ -183,9 +196,10 @@ export default function Home() {
           </div>
 
           {/* Footer */}
-          <div className="mt-6 text-center">
-            <p className="text-xs text-gray-500">
-              Secure login • End-to-end encryption • Role-based access
+          <div className="mt-8 text-center">
+            <div className="w-full h-1 bg-emerald-600 mb-4"></div>
+            <p className="text-xs text-gray-700 font-bold uppercase tracking-widest">
+              SECURE • ENCRYPTED • ROLE-BASED ACCESS
             </p>
           </div>
         </div>
