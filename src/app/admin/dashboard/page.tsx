@@ -10,6 +10,7 @@ import { VendorManagement } from '@/modules/vendors/VendorManagement';
 import { WhatsAppTestDashboard } from '@/components/whatsapp/WhatsAppTestDashboard';
 import { ExportButton } from '@/components/admin/ExportButton';
 import ShipperManagement from '@/components/admin/ShipperManagement';
+import { VehicleDashboard } from '@/modules/analytics/VehicleDashboard';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -19,10 +20,11 @@ export default function AdminDashboard() {
     pendingTrips: 0,
     inTransitTrips: 0,
     completedTrips: 0,
+    invoicingTrips: 0,
     totalRevenue: 0,
   });
   const [adminTrips, setAdminTrips] = useState([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'manage' | 'vendors' | 'shippers' | 'whatsapp'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'manage' | 'invoicing' | 'vendors' | 'shippers' | 'vehicles' | 'whatsapp'>('overview');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const router = useRouter();
 
@@ -57,6 +59,7 @@ export default function AdminDashboard() {
             pendingTrips: trips.filter((t: any) => t.status === 'PENDING').length,
             inTransitTrips: trips.filter((t: any) => t.status === 'IN_PROGRESS').length,
             completedTrips: trips.filter((t: any) => t.status === 'COMPLETED').length,
+            invoicingTrips: trips.filter((t: any) => t.status === 'INVOICING').length,
             totalRevenue: trips.reduce((sum: number, t: any) => sum + (t.freight || 0), 0),
           });
         }
@@ -97,7 +100,7 @@ export default function AdminDashboard() {
           {/* Navigation Tabs */}
           <div className="bg-white border border-gray-200 rounded-sm mb-8">
             <nav className="flex space-x-1 p-1">
-              {['overview', 'manage', 'vendors', 'shippers', 'whatsapp'].map((tab) => (
+              {['overview', 'manage', 'invoicing', 'vendors', 'shippers', 'vehicles', 'whatsapp'].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab as any)}
@@ -107,7 +110,7 @@ export default function AdminDashboard() {
                       : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
                   }`}
                 >
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  {tab === 'invoicing' ? 'Invoicing' : tab.charAt(0).toUpperCase() + tab.slice(1)}
                 </button>
               ))}
             </nav>
@@ -222,7 +225,7 @@ export default function AdminDashboard() {
                         <p className="text-xs text-gray-500">trips</p>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between py-3">
+                    <div className="flex items-center justify-between py-3 border-b border-gray-100">
                       <div className="flex items-center">
                         <div className="w-3 h-3 bg-green-500 rounded-sm mr-3"></div>
                         <div>
@@ -232,6 +235,19 @@ export default function AdminDashboard() {
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-light text-gray-900">{stats.completedTrips}</p>
+                        <p className="text-xs text-gray-500">trips</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between py-3">
+                      <div className="flex items-center">
+                        <div className="w-3 h-3 bg-purple-500 rounded-sm mr-3"></div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Invoicing</p>
+                          <p className="text-xs text-gray-500">Awaiting invoice generation</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-light text-gray-900">{stats.invoicingTrips}</p>
                         <p className="text-xs text-gray-500">trips</p>
                       </div>
                     </div>
@@ -304,6 +320,12 @@ export default function AdminDashboard() {
                       Manage Vendors
                     </button>
                     <button 
+                      onClick={() => setActiveTab('vehicles')}
+                      className="w-full bg-white border border-gray-300 text-gray-900 py-3 px-4 rounded-sm hover:bg-gray-50 transition-colors duration-200 text-sm font-medium"
+                    >
+                      Vehicle Analytics
+                    </button>
+                    <button 
                       onClick={() => setActiveTab('whatsapp')}
                       className="w-full bg-white border border-gray-300 text-gray-900 py-3 px-4 rounded-sm hover:bg-gray-50 transition-colors duration-200 text-sm font-medium"
                     >
@@ -328,12 +350,23 @@ export default function AdminDashboard() {
             />
           )}
 
+          {activeTab === 'invoicing' && (
+            <AdminTripTable 
+              trips={adminTrips.filter((t: any) => t.status === 'INVOICING')} 
+              onRefresh={() => setRefreshTrigger(prev => prev + 1)} 
+            />
+          )}
+
           {activeTab === 'vendors' && (
             <VendorManagement onEdit={(vendor) => console.log('Edit vendor:', vendor)} />
           )}
 
           {activeTab === 'shippers' && (
             <ShipperManagement />
+          )}
+
+          {activeTab === 'vehicles' && (
+            <VehicleDashboard />
           )}
 
           {activeTab === 'whatsapp' && (
