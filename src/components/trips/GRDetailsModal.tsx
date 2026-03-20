@@ -91,7 +91,10 @@ export function GRDetailsModal({ trip, grData, onClose, onRefresh }: GRDetailsMo
       );
 
       toast.success('POD marked as received!');
-      if (onRefresh) onRefresh();
+      if (onRefresh) {
+        await onRefresh();
+      }
+      onClose(); // Close the GR modal to show the updated status in the trip details/table
     } catch (error: any) {
       console.error('Mark POD received error:', error);
       toast.error(error.response?.data?.message || 'Failed to mark POD as received');

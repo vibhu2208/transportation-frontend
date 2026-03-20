@@ -135,6 +135,7 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'in_progress': return 'bg-blue-100 text-blue-800';
       case 'completed': return 'bg-green-100 text-green-800';
+      case 'invoicing': return 'bg-purple-100 text-purple-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
@@ -145,6 +146,7 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
       case 'pending': return 'Pending';
       case 'in_progress': return 'In Transit';
       case 'completed': return 'Completed';
+      case 'invoicing': return 'Invoicing';
       case 'cancelled': return 'Cancelled';
       default: return status;
     }
@@ -417,7 +419,7 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                     <div>
                       <span className="text-sm font-medium text-gray-500">Current Status:</span>
                       <div className="mt-1">
-                        {updatingStatus === showTripModal.tripNo ? (
+                        {updatingStatus === showTripModal.id ? (
                           <div className="flex items-center">
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
                             <span className="text-xs text-gray-500">Updating...</span>
@@ -426,7 +428,7 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                           <select
                             value={showTripModal.status}
                             onChange={(e) => {
-                              handleStatusChange(showTripModal.tripNo, e.target.value);
+                              handleStatusChange(showTripModal.id, e.target.value);
                               setShowTripModal({...showTripModal, status: e.target.value});
                             }}
                             className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full border-0 cursor-pointer focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 ${getStatusColor(showTripModal.status)}`}
@@ -435,6 +437,7 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                             <option value="PENDING">Pending</option>
                             <option value="IN_PROGRESS">In Transit</option>
                             <option value="COMPLETED">Completed</option>
+                            <option value="INVOICING">Invoicing</option>
                             <option value="CANCELLED">Cancelled</option>
                           </select>
                         )}
