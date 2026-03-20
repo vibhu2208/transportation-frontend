@@ -69,6 +69,11 @@ export interface GoodsReceipt {
   grPhotoUrl?: string;
   grBiltyImages?: string[];
   
+  // POD (Proof of Delivery) fields
+  podImages?: string[];
+  podReceived?: boolean;
+  podReceivedAt?: string;
+  
   createdAt: string;
   updatedAt: string;
 }
@@ -136,4 +141,7 @@ export interface CreateGoodsReceiptDto {
   expenses?: ExpenseItem[];
   grPhotoUrl?: string;
   grBiltyImages?: string[];
+  
+  // POD (Proof of Delivery) fields
+  podImages?: string[];
 }

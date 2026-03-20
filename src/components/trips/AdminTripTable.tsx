@@ -3,8 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { api } from '@/lib/api';
-import { OperationsUpdateForm } from './OperationsUpdateForm';
-import { AccountsUpdateForm } from './AccountsUpdateForm';
+import { OperationsUpdateModal } from './OperationsUpdateModal';
+import { AccountsUpdateModal } from './AccountsUpdateModal';
+import { GRDetailsModal } from './GRDetailsModal';
 import { goodsReceiptApi } from '@/lib/api-client';
 import { GoodsReceipt } from '@/types/goods-receipt';
 
@@ -42,43 +43,84 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [expandedTrip, setExpandedTrip] = useState<string | null>(null);
   const [grData, setGrData] = useState<Record<string, GoodsReceipt[]>>({});
+  const [showTripModal, setShowTripModal] = useState<AdminTripData | null>(null);
+  const [showGRModal, setShowGRModal] = useState<AdminTripData | null>(null);
+  const [showOperationsModal, setShowOperationsModal] = useState<AdminTripData | null>(null);
+  const [showAccountsModal, setShowAccountsModal] = useState<AdminTripData | null>(null);
+  
+  // Filter states
+  const [filters, setFilters] = useState({
+    to: '',
+    from: '',
+    vehicleNumber: '',
+    party: '',
+    date: ''
+  });
 
-  const handleOperationsUpdate = (tripId: string) => {
-    setSelectedTrip(tripId);
-    setUpdateMode('operations');
+  const handleOperationsUpdate = (trip: AdminTripData) => {
+    setShowOperationsModal(trip);
+    setShowTripModal(null); // Close trip modal when opening operations modal
   };
 
-  const handleAccountsUpdate = (tripId: string) => {
-    setSelectedTrip(tripId);
-    setUpdateMode('accounts');
+  const handleAccountsUpdate = (trip: AdminTripData) => {
+    setShowAccountsModal(trip);
+    setShowTripModal(null); // Close trip modal when opening accounts modal
+  };
+
+  const handleBackToTripDetails = (trip: AdminTripData) => {
+    setShowTripModal(trip);
+    setShowOperationsModal(null);
+    setShowAccountsModal(null);
   };
 
   const handleUpdateComplete = () => {
-    setSelectedTrip(null);
-    setUpdateMode(null);
+    setShowOperationsModal(null);
+    setShowAccountsModal(null);
     onRefresh();
   };
 
-  const handleCancel = () => {
-    setSelectedTrip(null);
-    setUpdateMode(null);
+  const handleModalCancel = () => {
+    setShowOperationsModal(null);
+    setShowAccountsModal(null);
   };
 
+  const handleFilterChange = (field: string, value: string) => {
+    setFilters(prev => ({ ...prev, [field]: value }));
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      to: '',
+      from: '',
+      vehicleNumber: '',
+      party: '',
+      date: ''
+    });
+  };
+
+  const filteredTrips = trips.filter(trip => {
+    return (
+      (!filters.to || trip.toLocation.toLowerCase().includes(filters.to.toLowerCase())) &&
+      (!filters.from || trip.fromLocation.toLowerCase().includes(filters.from.toLowerCase())) &&
+      (!filters.vehicleNumber || trip.vehicleNumber.toLowerCase().includes(filters.vehicleNumber.toLowerCase())) &&
+      (!filters.party || trip.partyName.toLowerCase().includes(filters.party.toLowerCase())) &&
+      (!filters.date || trip.date.includes(filters.date))
+    );
+  });
+
   const toggleExpand = async (trip: AdminTripData) => {
-    if (expandedTrip === trip.tripNo) {
-      setExpandedTrip(null);
-    } else {
-      setExpandedTrip(trip.tripNo);
-      // Fetch GR data if not already loaded
-      if (!grData[trip.tripNo]) {
-        try {
-          console.log('Fetching GR data for trip:', trip.id, 'tripNo:', trip.tripNo);
-          const receipts = await goodsReceiptApi.getByTripId(trip.id);
-          console.log('GR receipts received:', receipts);
-          setGrData(prev => ({ ...prev, [trip.tripNo]: receipts }));
-        } catch (error) {
-          console.error('Error fetching GR data:', error);
-        }
+    // Set the GR modal trip
+    setShowGRModal(trip);
+    
+    // Fetch GR data if not already loaded
+    if (!grData[trip.tripNo]) {
+      try {
+        console.log('Fetching GR data for trip:', trip.id, 'tripNo:', trip.tripNo);
+        const receipts = await goodsReceiptApi.getByTripId(trip.id);
+        console.log('GR receipts received:', receipts);
+        setGrData(prev => ({ ...prev, [trip.tripNo]: receipts }));
+      } catch (error) {
+        console.error('Error fetching GR data:', error);
       }
     }
   };
@@ -130,45 +172,81 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
     return profitLoss >= 0 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold';
   };
 
-  if (updateMode && selectedTrip) {
-    const trip = trips.find(t => t.tripNo === selectedTrip);
-    if (!trip) return null;
-
-    if (updateMode === 'operations') {
-      return (
-        <OperationsUpdateForm
-          tripId={selectedTrip}
-          currentData={{
-            grLrNo: trip.grLrNo,
-            tollExpense: trip.tollExpense,
-          }}
-          onSave={handleUpdateComplete}
-          onCancel={handleCancel}
-        />
-      );
-    }
-
-    if (updateMode === 'accounts') {
-      return (
-        <AccountsUpdateForm
-          tripId={selectedTrip}
-          currentData={{
-            freight: trip.freight,
-            billNo: trip.billNo,
-            billDate: trip.billDate,
-          }}
-          onSave={handleUpdateComplete}
-          onCancel={handleCancel}
-        />
-      );
-    }
-  }
-
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-200">
         <h3 className="text-lg font-medium text-gray-900">Transportation Operations Register</h3>
         <p className="mt-1 text-sm text-gray-500">Complete lifecycle view of all trips with operational and financial data</p>
+      </div>
+
+      {/* Filters Section */}
+      <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-sm font-medium text-gray-900">Filter Trips</h4>
+          <button
+            onClick={clearFilters}
+            className="text-sm text-gray-500 hover:text-gray-700"
+          >
+            Clear All
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">To Location</label>
+            <input
+              type="text"
+              value={filters.to}
+              onChange={(e) => handleFilterChange('to', e.target.value)}
+              placeholder="Search destination..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">From Location</label>
+            <input
+              type="text"
+              value={filters.from}
+              onChange={(e) => handleFilterChange('from', e.target.value)}
+              placeholder="Search origin..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Vehicle Number</label>
+            <input
+              type="text"
+              value={filters.vehicleNumber}
+              onChange={(e) => handleFilterChange('vehicleNumber', e.target.value)}
+              placeholder="Search vehicle..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Party Name</label>
+            <input
+              type="text"
+              value={filters.party}
+              onChange={(e) => handleFilterChange('party', e.target.value)}
+              placeholder="Search party..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
+            <input
+              type="text"
+              value={filters.date}
+              onChange={(e) => handleFilterChange('date', e.target.value)}
+              placeholder="Search date..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+        </div>
+        {filteredTrips.length !== trips.length && (
+          <div className="mt-3 text-sm text-gray-600">
+            Showing {filteredTrips.length} of {trips.length} trips
+          </div>
+        )}
       </div>
 
       <div className="overflow-x-auto">
@@ -182,23 +260,15 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
               <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">From</th>
               <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">To</th>
               <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vehicle</th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">GR/LR No</th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Toll</th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Freight</th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Advance</th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Initial</th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Exp</th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bill No</th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bill Date</th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">P&L</th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {trips.map((trip) => (
-              <React.Fragment key={trip.tripNo}>
-              <tr className="hover:bg-gray-50">
+            {filteredTrips.map((trip) => (
+              <tr 
+                key={trip.tripNo}
+                className="hover:bg-gray-50 cursor-pointer" 
+                onClick={() => setShowTripModal(trip)}
+              >
                 <td className="px-2 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                   {trip.tripNo}
                 </td>
@@ -220,224 +290,253 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                 <td className="px-2 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                   {trip.vehicleNumber}
                 </td>
-                <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-900">
-                  {trip.grLrNo || '-'}
-                </td>
-                <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-900">
-                  {formatCurrency(trip.tollExpense)}
-                </td>
-                <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-900">
-                  {formatCurrency(trip.freight)}
-                </td>
-                <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-900">
-                  {formatCurrency(trip.advance)}
-                </td>
-                <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-900">
-                  {formatCurrency(trip.initialExpense)}
-                </td>
-                <td className="px-2 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {formatCurrency(trip.totalExpense)}
-                </td>
-                <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-900">
-                  {trip.billNo || '-'}
-                </td>
-                <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-900">
-                  {trip.billDate || '-'}
-                </td>
-                <td className="px-2 py-3 whitespace-nowrap text-sm font-medium">
-                  <span className={getProfitLossColor(trip.profitLoss)}>
-                    {formatCurrency(trip.profitLoss)}
-                  </span>
-                </td>
-                <td className="px-2 py-3 whitespace-nowrap">
-                  {updatingStatus === trip.tripNo ? (
-                    <div className="flex items-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                      <span className="text-xs text-gray-500">Updating...</span>
-                    </div>
-                  ) : (
-                    <select
-                      value={trip.status}
-                      onChange={(e) => handleStatusChange(trip.tripNo, e.target.value)}
-                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border-0 cursor-pointer focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 ${getStatusColor(trip.status)}`}
-                      disabled={updatingStatus !== null}
-                    >
-                      <option value="PENDING">Pending</option>
-                      <option value="IN_PROGRESS">In Transit</option>
-                      <option value="COMPLETED">Completed</option>
-                      <option value="CANCELLED">Cancelled</option>
-                    </select>
-                  )}
-                </td>
-                <td className="px-2 py-3 whitespace-nowrap text-sm font-medium">
-                  <div className="flex space-x-1">
-                    <button
-                      onClick={() => {
-                        setSelectedTrip(trip.tripNo);
-                        setUpdateMode('operations');
-                      }}
-                      className="text-blue-600 hover:text-blue-900 text-xs px-1"
-                    >
-                      Ops
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedTrip(trip.tripNo);
-                        setUpdateMode('accounts');
-                      }}
-                      className="text-green-600 hover:text-green-900 text-xs px-1"
-                    >
-                      Acc
-                    </button>
-                    <button
-                      onClick={() => toggleExpand(trip)}
-                      className="text-purple-600 hover:text-purple-900 text-xs px-1"
-                      title="View GR Details"
-                    >
-                      {expandedTrip === trip.tripNo ? '▼' : '▶'} GR
-                    </button>
-                  </div>
-                </td>
               </tr>
-              {expandedTrip === trip.tripNo && (
-                <tr key={`${trip.tripNo}-gr`}>
-                  <td colSpan={18} className="px-6 py-4 bg-gray-50">
-                    <div className="space-y-4">
-                      <h4 className="font-semibold text-gray-900 text-sm">Goods Receipt Details</h4>
-                      {grData[trip.tripNo] && grData[trip.tripNo].length > 0 ? (
-                        (() => {
-                          console.log('Rendering GR data for trip:', trip.tripNo, 'GR count:', grData[trip.tripNo].length);
-                          return grData[trip.tripNo].map((gr, index) => {
-                            console.log('Rendering GR:', gr.id, 'grBiltyImages:', gr.grBiltyImages);
-                            return (
-                              <div key={gr.id} className="bg-white p-4 rounded border border-gray-200">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-                              <div>
-                                <span className="font-medium text-gray-600">Branch:</span>
-                                <p className="text-gray-900">{gr.branchName}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-600">CN No:</span>
-                                <p className="text-gray-900">{gr.cnNo}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-600">CN Date:</span>
-                                <p className="text-gray-900">{gr.cnDate}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-600">Consignor:</span>
-                                <p className="text-gray-900">{gr.consignor}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-600">Consignee:</span>
-                                <p className="text-gray-900">{gr.consigneeName}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-600">Vehicle Type:</span>
-                                <p className="text-gray-900">{gr.vehicleType}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-600">Package:</span>
-                                <p className="text-gray-900">{gr.package} {gr.typeOfPkg}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-600">Goods:</span>
-                                <p className="text-gray-900">{gr.goodsDescription}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-600">Freight:</span>
-                                <p className="text-gray-900">₹{gr.freight}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-600">Total Freight:</span>
-                                <p className="text-gray-900">₹{gr.totalFreight || '-'}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-600">GST:</span>
-                                <p className="text-gray-900">₹{gr.gst || '-'}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-600">Net Payable:</span>
-                                <p className="text-gray-900 font-semibold">₹{gr.netPayable || '-'}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-600">Actual WT:</span>
-                                <p className="text-gray-900">{gr.actualWt} {gr.unit}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-600">Charged WT:</span>
-                                <p className="text-gray-900">{gr.chargedWt} {gr.unit}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-600">GST Paid By:</span>
-                                <p className="text-gray-900">{gr.gstPaidBy}</p>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-600">Account:</span>
-                                <p className="text-gray-900">{gr.account}</p>
-                              </div>
-                            </div>
-                            {gr.expenses && gr.expenses.length > 0 && (
-                              <div className="mt-4">
-                                <h5 className="font-medium text-gray-700 text-xs mb-2">Expenses:</h5>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                  {gr.expenses.map((exp: any, i: number) => (
-                                    <div key={i} className="text-xs bg-gray-50 p-2 rounded">
-                                      <span className="font-medium">{exp.expense}:</span> ₹{exp.amount}
-                                      {exp.narration && <span className="text-gray-600"> - {exp.narration}</span>}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                            {gr.grPhotoUrl && (
-                              <div className="mt-4">
-                                <a href={gr.grPhotoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 text-xs">
-                                  📷 View GR Photo
-                                </a>
-                              </div>
-                            )}
-                            {gr.grBiltyImages && Array.isArray(gr.grBiltyImages) && gr.grBiltyImages.length > 0 && (
-                              <div className="mt-4">
-                                <h5 className="font-medium text-gray-700 text-xs mb-2">GR/Bilty Images:</h5>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                                  {gr.grBiltyImages.map((imageUrl: string, i: number) => (
-                                    <div key={i} className="relative group">
-                                      <img
-                                        src={imageUrl.startsWith('http') ? imageUrl : `${process.env.NEXT_PUBLIC_API_URL}${imageUrl}`}
-                                        alt={`GR/Bilty Image ${i + 1}`}
-                                        className="w-full h-20 object-cover rounded border cursor-pointer hover:opacity-75"
-                                        onClick={() => window.open(imageUrl.startsWith('http') ? imageUrl : `${process.env.NEXT_PUBLIC_API_URL}${imageUrl}`, '_blank')}
-                                      />
-                                      <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1 rounded-b opacity-0 group-hover:opacity-100 transition-opacity">
-                                        Image {i + 1}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                            );
-                          })
-                        })()
-                      ) : (
-                        <p className="text-gray-500 text-sm">No GR data available for this trip</p>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              )}
-              </React.Fragment>
             ))}
           </tbody>
         </table>
       </div>
 
-      {trips.length === 0 && (
+      {filteredTrips.length === 0 && (
         <div className="text-center py-12">
-          <div className="text-gray-500">No trips found</div>
+          <div className="text-gray-500">
+            {trips.length === 0 ? 'No trips found' : 'No trips match your filters'}
+          </div>
+          {trips.length > 0 && filteredTrips.length === 0 && (
+            <button
+              onClick={clearFilters}
+              className="mt-2 text-blue-600 hover:text-blue-800 text-sm"
+            >
+              Clear filters to see all trips
+            </button>
+          )}
         </div>
+      )}
+
+      {/* Trip Detail Modal */}
+      {showTripModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-4/5 lg:w-3/4 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Trip Details - {showTripModal.tripNo}</h3>
+                <button
+                  onClick={() => setShowTripModal(null)}
+                  className="text-gray-400 hover:text-gray-500"
+                >
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                {/* Basic Information */}
+                <div className="col-span-1 md:col-span-2 lg:col-span-3">
+                  <h4 className="font-semibold text-gray-900 mb-3 border-b pb-2">Basic Information</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <div>
+                      <span className="text-sm font-medium text-gray-500">Trip No:</span>
+                      <p className="text-sm text-gray-900">{showTripModal.tripNo}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-gray-500">Date:</span>
+                      <p className="text-sm text-gray-900">{showTripModal.date}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-gray-500">Vendor:</span>
+                      <p className="text-sm text-gray-900">{showTripModal.vendorName}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-gray-500">Party:</span>
+                      <p className="text-sm text-gray-900">{showTripModal.partyName}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-gray-500">From:</span>
+                      <p className="text-sm text-gray-900">{showTripModal.fromLocation}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-gray-500">To:</span>
+                      <p className="text-sm text-gray-900">{showTripModal.toLocation}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-gray-500">Vehicle:</span>
+                      <p className="text-sm text-gray-900">{showTripModal.vehicleNumber}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-gray-500">GR/LR No:</span>
+                      <p className="text-sm text-gray-900">{showTripModal.grLrNo || '-'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Financial Information */}
+                <div className="col-span-1 md:col-span-2 lg:col-span-3">
+                  <h4 className="font-semibold text-gray-900 mb-3 border-b pb-2">Financial Information</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <div>
+                      <span className="text-sm font-medium text-gray-500">Freight:</span>
+                      <p className="text-sm text-gray-900">{formatCurrency(showTripModal.freight)}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-gray-500">Advance:</span>
+                      <p className="text-sm text-gray-900">{formatCurrency(showTripModal.advance)}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-gray-500">Toll:</span>
+                      <p className="text-sm text-gray-900">{formatCurrency(showTripModal.tollExpense)}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-gray-500">Initial:</span>
+                      <p className="text-sm text-gray-900">{formatCurrency(showTripModal.initialExpense)}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-gray-500">Total Expense:</span>
+                      <p className="text-sm text-gray-900">{formatCurrency(showTripModal.totalExpense)}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-gray-500">P&L:</span>
+                      <p className={`text-sm font-medium ${getProfitLossColor(showTripModal.profitLoss)}`}>
+                        {formatCurrency(showTripModal.profitLoss)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-gray-500">Bill No:</span>
+                      <p className="text-sm text-gray-900">{showTripModal.billNo || '-'}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-gray-500">Bill Date:</span>
+                      <p className="text-sm text-gray-900">{showTripModal.billDate || '-'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status */}
+                <div className="col-span-1 md:col-span-2 lg:col-span-3">
+                  <h4 className="font-semibold text-gray-900 mb-3 border-b pb-2">Status & Actions</h4>
+                  <div className="flex items-center gap-4 mb-4">
+                    <div>
+                      <span className="text-sm font-medium text-gray-500">Current Status:</span>
+                      <div className="mt-1">
+                        {updatingStatus === showTripModal.tripNo ? (
+                          <div className="flex items-center">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                            <span className="text-xs text-gray-500">Updating...</span>
+                          </div>
+                        ) : (
+                          <select
+                            value={showTripModal.status}
+                            onChange={(e) => {
+                              handleStatusChange(showTripModal.tripNo, e.target.value);
+                              setShowTripModal({...showTripModal, status: e.target.value});
+                            }}
+                            className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full border-0 cursor-pointer focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 ${getStatusColor(showTripModal.status)}`}
+                            disabled={updatingStatus !== null}
+                          >
+                            <option value="PENDING">Pending</option>
+                            <option value="IN_PROGRESS">In Transit</option>
+                            <option value="COMPLETED">Completed</option>
+                            <option value="CANCELLED">Cancelled</option>
+                          </select>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="col-span-1 md:col-span-2 lg:col-span-3">
+                  <h4 className="font-semibold text-gray-900 mb-3 border-b pb-2">Actions</h4>
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      onClick={() => {
+                        handleOperationsUpdate(showTripModal);
+                        setShowTripModal(null);
+                      }}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-sm hover:bg-blue-700 transition-colors text-sm font-medium"
+                    >
+                      Update Operations
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleAccountsUpdate(showTripModal);
+                        setShowTripModal(null);
+                      }}
+                      className="bg-green-600 text-white px-4 py-2 rounded-sm hover:bg-green-700 transition-colors text-sm font-medium"
+                    >
+                      Update Accounts
+                    </button>
+                    <button
+                      onClick={() => {
+                        toggleExpand(showTripModal);
+                      }}
+                      className="bg-purple-600 text-white px-4 py-2 rounded-sm hover:bg-purple-700 transition-colors text-sm font-medium"
+                    >
+                      View GR Details
+                    </button>
+                  </div>
+                </div>
+
+                {/* Remarks */}
+                {showTripModal.remarks && (
+                  <div className="col-span-1 md:col-span-2 lg:col-span-3">
+                    <h4 className="font-semibold text-gray-900 mb-3 border-b pb-2">Remarks</h4>
+                    <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-sm">{showTripModal.remarks}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setShowTripModal(null)}
+                  className="bg-gray-500 text-white px-4 py-2 rounded-sm hover:bg-gray-600 transition-colors text-sm font-medium"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* GR Details Modal */}
+      {showGRModal && (
+        <GRDetailsModal
+          trip={showGRModal}
+          grData={grData[showGRModal.tripNo] || []}
+          onClose={() => setShowGRModal(null)}
+          onRefresh={onRefresh}
+        />
+      )}
+
+      {/* Operations Update Modal */}
+      {showOperationsModal && (
+        <OperationsUpdateModal
+          tripId={showOperationsModal.id}
+          tripNo={showOperationsModal.tripNo}
+          currentData={{
+            grLrNo: showOperationsModal.grLrNo,
+            tollExpense: showOperationsModal.tollExpense,
+          }}
+          onSave={handleUpdateComplete}
+          onCancel={handleModalCancel}
+          onBack={() => handleBackToTripDetails(showOperationsModal)}
+        />
+      )}
+
+      {/* Accounts Update Modal */}
+      {showAccountsModal && (
+        <AccountsUpdateModal
+          tripId={showAccountsModal.id}
+          tripNo={showAccountsModal.tripNo}
+          currentData={{
+            freight: showAccountsModal.freight,
+            billNo: showAccountsModal.billNo,
+            billDate: showAccountsModal.billDate,
+          }}
+          onSave={handleUpdateComplete}
+          onCancel={handleModalCancel}
+          onBack={() => handleBackToTripDetails(showAccountsModal)}
+        />
       )}
     </div>
   );
