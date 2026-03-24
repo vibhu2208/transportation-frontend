@@ -1,0 +1,90 @@
+export interface Trip {
+  id: string;
+  tripNo: string;
+  date: string;
+  partyName: string;
+  fromLocation: string;
+  toLocation: string;
+  vehicleNumber: string;
+  freight?: number | null;
+  effectiveFreight?: number;
+  status: string;
+  invoiceId?: string;
+  goodsReceipts?: any[];
+  vendor?: any;
+}
+
+export interface PendingTripsByParty {
+  partyName: string;
+  tripCount: number;
+  trips: Trip[];
+}
+
+export interface CreateInvoiceRequest {
+  tripIds: string[];
+  partyId?: string;
+  partyName: string;
+  partyGstIn?: string;
+  partyAddress?: string;
+  gstRate?: number;
+  notes?: string;
+}
+
+export interface MoneyReceipt {
+  id: string;
+  receiptNo: string;
+  amount: number;
+  paymentType: string;
+  paymentDate: string;
+  paymentMode?: string | null;
+  referenceNo?: string | null;
+  notes?: string | null;
+}
+
+export interface MoneyReceiptSummary {
+  invoiceId: string;
+  invoiceNo: string;
+  grandTotal: number;
+  paidTotal: number;
+  remaining: number;
+  receipts: MoneyReceipt[];
+}
+
+export interface CreateMoneyReceiptRequest {
+  paymentType: 'PARTIAL' | 'FULL';
+  amount?: number;
+  paymentDate?: string;
+  paymentMode?: string;
+  referenceNo?: string;
+  notes?: string;
+}
+
+export interface Invoice {
+  id: string;
+  invoiceNo: string;
+  invoiceDate: string;
+  partyName: string;
+  partyGstIn?: string;
+  partyAddress?: string;
+  subTotal: number;
+  gstRate: number;
+  gstAmount: number;
+  grandTotal: number;
+  status: string;
+  notes?: string;
+  trips: Trip[];
+  moneyReceipts?: MoneyReceipt[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InvoiceTemplate {
+  key: string;
+  name: string;
+  description: string;
+}
+
+export interface DownloadInvoiceOptions {
+  templateKey?: string;
+  customHtmlTemplate?: string;
+}

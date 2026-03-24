@@ -1,12 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { VehicleAutocomplete } from '@/components/ui/VehicleAutocomplete';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { partiesApi } from '@/modules/parties/api';
+import { Party } from '@/modules/parties/types';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 
@@ -40,6 +43,37 @@ interface VendorSubmissionFormProps {
 
 export function VendorSubmissionForm({ onSave, onCancel }: VendorSubmissionFormProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [parties, setParties] = useState<Party[]>([]);
+
+  useEffect(() => {
+    const fetchParties = async () => {
+      try {
+        console.log('VendorSubmissionForm: Fetching parties...');
+        let data = await partiesApi.getParties();
+        console.log('VendorSubmissionForm: Parties received:', data);
+        
+        if (data.length === 0) {
+          console.log('VendorSubmissionForm: No parties found, attempting sync...');
+          try {
+            await partiesApi.syncParties();
+            data = await partiesApi.getParties();
+            console.log('VendorSubmissionForm: Parties after sync:', data);
+          } catch (syncError) {
+            console.error('VendorSubmissionForm: Sync failed:', syncError);
+          }
+        }
+        
+        setParties(data);
+      } catch (error: any) {
+        console.error('VendorSubmissionForm: Error fetching parties:', error);
+        if (error.response) {
+          console.error('VendorSubmissionForm: Response data:', error.response.data);
+          console.error('VendorSubmissionForm: Response status:', error.response.status);
+        }
+      }
+    };
+    fetchParties();
+  }, []);
   
   const {
     register,
@@ -107,11 +141,38 @@ export function VendorSubmissionForm({ onSave, onCancel }: VendorSubmissionFormP
             <label className="block text-sm font-medium text-foreground mb-2">
               Party Name *
             </label>
-            <Input
-              {...register('partyName')}
-              error={errors.partyName?.message}
-              placeholder="Customer or party name"
-            />
+            {parties.length > 0 ? (
+              <Controller
+                name="partyName"
+                control={control}
+                render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger className={errors.partyName ? 'border-destructive' : ''}>
+                      <SelectValue placeholder="Select a party" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {parties.map((party) => (
+                        <SelectItem key={party.id} value={party.name}>
+                          {party.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            ) : (
+              <Input
+                {...register('partyName')}
+                error={errors.partyName?.message}
+                placeholder="Type party name"
+              />
+            )}
+            {errors.partyName && (
+              <p className="mt-1 text-sm text-destructive">{errors.partyName.message}</p>
+            )}
+            {parties.length === 0 && !isLoading && (
+              <p className="mt-1 text-xs text-muted-foreground">No parties found. Please type the name manually.</p>
+            )}
           </div>
 
           <div>

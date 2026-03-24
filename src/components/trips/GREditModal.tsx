@@ -11,31 +11,37 @@ import toast from 'react-hot-toast';
 import axios from 'axios';
 
 const grSchema = z.object({
+  grNo: z.string().min(1, 'GR No is required'),
+  cnDate: z.string().min(1, 'Date is required'),
+  fromStation: z.string().min(1, 'From Station is required'),
+  toStation: z.string().min(1, 'To Station is required'),
+  truckLorryNo: z.string().min(1, 'Vehicle No is required'),
+  freight: z.string().min(1, 'Freight is required'),
+  package: z.string().min(1, 'No of box is required'),
+  detentionLoading: z.string().min(1, 'Detention Loading is required'),
+  detentionUL: z.string().min(1, 'Detention U/L is required'),
+  toll: z.string().optional(),
+  labourCharges: z.string().min(1, 'Labour Charges is required'),
+  otherCharges: z.string().min(1, 'Other Charges is required'),
+  ewayDate: z.string().optional(),
   branchName: z.string().optional(),
   billedAtBranch: z.string().optional(),
   cnType: z.string().optional(),
   deliveryAt: z.string().optional(),
   cnNo: z.string().optional(),
-  cnDate: z.string().optional(),
   cnTime: z.string().optional(),
   consignor: z.string().optional(),
   chargedParty: z.string().optional(),
   consigneeName: z.string().optional(),
-  fromStation: z.string().optional(),
-  toStation: z.string().optional(),
   partySlab: z.string().optional(),
   distanceKm: z.string().optional(),
-  partyBillNo: z.string().optional(),
   partyBillDate: z.string().optional(),
   netInvValue: z.string().optional(),
-  truckLorryNo: z.string().optional(),
   agentTruck: z.string().optional(),
   capacity: z.string().optional(),
   vehicleType: z.string().optional(),
   comm: z.string().optional(),
   rate: z.string().optional(),
-  freight: z.string().optional(),
-  package: z.string().optional(),
   typeOfPkg: z.string().optional(),
   goodsDescription: z.string().optional(),
   actualWt: z.string().optional(),
@@ -50,7 +56,6 @@ const grSchema = z.object({
   totalFreight: z.string().optional(),
   gst: z.string().optional(),
   advanceDate: z.string().optional(),
-  ewayDate: z.string().optional(),
   netPayable: z.string().optional(),
   fromStationUp: z.string().optional(),
   toStationUp: z.string().optional(),
@@ -73,6 +78,43 @@ interface GREditModalProps {
   onBack?: () => void;
 }
 
+const DATE_FIELDS: (keyof GRData)[] = ['cnDate', 'partyBillDate', 'advanceDate', 'ewayDate'];
+
+const toInputDateValue = (value: unknown): string => {
+  if (!value || typeof value !== 'string') return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toISOString().split('T')[0];
+};
+
+const normalizeDefaultValues = (existingGR: any, trip: any): Partial<GRData> => {
+  if (!existingGR) {
+    return {
+      cnNo: trip.tripNo,
+      cnDate: new Date().toISOString().split('T')[0],
+      cnTime: new Date().toLocaleTimeString(),
+      truckLorryNo: trip.vehicleNumber,
+      agentTruck: trip.vehicleNumber,
+      fromStation: trip.fromLocation,
+      toStation: trip.toLocation,
+      gstPaidBy: 'Consignor',
+    };
+  }
+
+  const normalized = Object.entries(existingGR).reduce<Record<string, any>>((acc, [key, value]) => {
+    acc[key] = value ?? '';
+    return acc;
+  }, {});
+
+  DATE_FIELDS.forEach((field) => {
+    normalized[field] = toInputDateValue(normalized[field]);
+  });
+
+  return normalized as Partial<GRData>;
+};
+
 export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREditModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [grBiltyImages, setGrBiltyImages] = useState<string[]>(existingGR?.grBiltyImages || []);
@@ -84,16 +126,7 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
     formState: { errors },
   } = useForm<GRData>({
     resolver: zodResolver(grSchema),
-    defaultValues: existingGR || {
-      cnNo: trip.tripNo,
-      cnDate: new Date().toISOString().split('T')[0],
-      cnTime: new Date().toLocaleTimeString(),
-      truckLorryNo: trip.vehicleNumber,
-      agentTruck: trip.vehicleNumber,
-      fromStation: trip.fromLocation,
-      toStation: trip.toLocation,
-      gstPaidBy: 'Consignor',
-    },
+    defaultValues: normalizeDefaultValues(existingGR, trip),
   });
 
   const onSubmit = async (data: GRData) => {
@@ -125,6 +158,14 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
         tripId: trip.id,
         shipperId: shipperId,
       };
+
+      // Remove internal fields that shouldn't be sent back to the server
+      if (isEditing) {
+        delete (submitData as any).id;
+        delete (submitData as any).createdAt;
+        delete (submitData as any).updatedAt;
+        delete (submitData as any).trip;
+      }
 
       if (isEditing) {
         await axios.patch(
@@ -187,62 +228,117 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
             </button>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            {/* Consignment Basic Details */}
-            <section className="space-y-4">
-              <h3 className="text-lg font-semibold border-b pb-2">Consignment Basic Details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <form
+            onSubmit={handleSubmit(onSubmit, () => {
+              toast.error('Please fill all mandatory GR fields before updating');
+            })}
+            className="space-y-6"
+          >
+            {/* Essential Invoice Fields */}
+            <section className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
+              <h3 className="text-lg font-bold text-blue-900 border-b border-blue-200 pb-2 flex items-center gap-2">
+                <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded">MANDATORY</span>
+                Essential Invoice Fields
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Branch Name</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">GR No. *</label>
                   <Input
-                    {...register('branchName')}
-                    error={errors.branchName?.message}
+                    {...register('grNo', { required: true })}
+                    error={errors.grNo?.message}
+                    className="border-blue-300 focus:ring-blue-500"
+                    placeholder="Mandatory for Invoice"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Billed At Branch</label>
-                  <Input
-                    {...register('billedAtBranch')}
-                    error={errors.billedAtBranch?.message}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">CN Type</label>
-                  <Input
-                    {...register('cnType')}
-                    error={errors.cnType?.message}
-                    placeholder="e.g., To Be Billed"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Delivery At</label>
-                  <Input
-                    {...register('deliveryAt')}
-                    error={errors.deliveryAt?.message}
-                    placeholder="e.g., Door Delivery"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">CN No./TRIP NO</label>
-                  <Input
-                    {...register('cnNo')}
-                    error={errors.cnNo?.message}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">CN Date</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Date *</label>
                   <Input
                     type="date"
-                    {...register('cnDate')}
+                    {...register('cnDate', { required: true })}
                     error={errors.cnDate?.message}
+                    className="border-blue-300 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">CN Time</label>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">From Station *</label>
                   <Input
-                    type="time"
-                    {...register('cnTime')}
-                    error={errors.cnTime?.message}
+                    {...register('fromStation', { required: true })}
+                    error={errors.fromStation?.message}
+                    className="border-blue-300 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">To Station *</label>
+                  <Input
+                    {...register('toStation', { required: true })}
+                    error={errors.toStation?.message}
+                    className="border-blue-300 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Vehicle No *</label>
+                  <Input
+                    {...register('truckLorryNo', { required: true })}
+                    error={errors.truckLorryNo?.message}
+                    className="border-blue-300 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Freight *</label>
+                  <Input
+                    {...register('freight', { required: true })}
+                    error={errors.freight?.message}
+                    className="border-blue-300 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">No. of Boxes *</label>
+                  <Input
+                    {...register('package', { required: true })}
+                    error={errors.package?.message}
+                    className="border-blue-300 focus:ring-blue-500"
+                    placeholder="e.g. 50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Detention Loading *</label>
+                  <Input
+                    {...register('detentionLoading', { required: true })}
+                    error={errors.detentionLoading?.message}
+                    className="border-blue-300 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Detention U/L *</label>
+                  <Input
+                    {...register('detentionUL', { required: true })}
+                    error={errors.detentionUL?.message}
+                    className="border-blue-300 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Toll *</label>
+                  <Input
+                    {...register('toll')}
+                    error={errors.toll?.message}
+                    className="border-blue-300 focus:ring-blue-500"
+                    placeholder="Toll charges"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Labour Charges *</label>
+                  <Input
+                    {...register('labourCharges', { required: true })}
+                    error={errors.labourCharges?.message}
+                    className="border-blue-300 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Other Charges *</label>
+                  <Input
+                    {...register('otherCharges', { required: true })}
+                    error={errors.otherCharges?.message}
+                    className="border-blue-300 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -281,20 +377,6 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
               <h3 className="text-lg font-semibold border-b pb-2">Transport Route Details</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">From Station</label>
-                  <Input
-                    {...register('fromStation')}
-                    error={errors.fromStation?.message}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">To Station</label>
-                  <Input
-                    {...register('toStation')}
-                    error={errors.toStation?.message}
-                  />
-                </div>
-                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Party Slab</label>
                   <Input
                     {...register('partySlab')}
@@ -315,13 +397,6 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
             <section className="space-y-4">
               <h3 className="text-lg font-semibold border-b pb-2">Invoice / Billing Details</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Party Bill No / Date</label>
-                  <Input
-                    {...register('partyBillNo')}
-                    error={errors.partyBillNo?.message}
-                  />
-                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Party Bill Date</label>
                   <Input
@@ -344,13 +419,6 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
             <section className="space-y-4">
               <h3 className="text-lg font-semibold border-b pb-2">Vehicle / Transport Details</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Truck/Lorry No</label>
-                  <Input
-                    {...register('truckLorryNo')}
-                    error={errors.truckLorryNo?.message}
-                  />
-                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Agent Truck</label>
                   <Input
@@ -387,13 +455,6 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
                     error={errors.rate?.message}
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Freight</label>
-                  <Input
-                    {...register('freight')}
-                    error={errors.freight?.message}
-                  />
-                </div>
               </div>
             </section>
 
@@ -401,13 +462,6 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
             <section className="space-y-4">
               <h3 className="text-lg font-semibold border-b pb-2">Package / Goods Details</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Package</label>
-                  <Input
-                    {...register('package')}
-                    error={errors.package?.message}
-                  />
-                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Type of Pkg</label>
                   <Input

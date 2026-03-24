@@ -7,10 +7,12 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { UserRole } from '@/types/auth';
 import { AdminTripTable } from '@/components/trips/AdminTripTable';
 import { VendorManagement } from '@/modules/vendors/VendorManagement';
-import { WhatsAppTestDashboard } from '@/components/whatsapp/WhatsAppTestDashboard';
+import WhatsAppTestDashboard from '@/components/whatsapp/WhatsAppTestDashboard';
 import { ExportButton } from '@/components/admin/ExportButton';
 import ShipperManagement from '@/components/admin/ShipperManagement';
 import { VehicleDashboard } from '@/modules/analytics/VehicleDashboard';
+import InvoiceManagement from '@/modules/invoices/InvoiceManagement';
+import PartyManagement from '@/modules/parties/PartyManagement';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -24,7 +26,7 @@ export default function AdminDashboard() {
     totalRevenue: 0,
   });
   const [adminTrips, setAdminTrips] = useState([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'manage' | 'invoicing' | 'vendors' | 'shippers' | 'vehicles' | 'whatsapp'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'manage' | 'invoicing' | 'invoices' | 'parties' | 'vendors' | 'shippers' | 'vehicles' | 'whatsapp'>('overview');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const router = useRouter();
 
@@ -100,7 +102,7 @@ export default function AdminDashboard() {
           {/* Navigation Tabs */}
           <div className="bg-white border border-gray-200 rounded-sm mb-8">
             <nav className="flex space-x-1 p-1">
-              {['overview', 'manage', 'invoicing', 'vendors', 'shippers', 'vehicles', 'whatsapp'].map((tab) => (
+              {['overview', 'manage', 'invoices', 'parties', 'vendors', 'shippers', 'vehicles', 'whatsapp'].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab as any)}
@@ -110,7 +112,7 @@ export default function AdminDashboard() {
                       : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
                   }`}
                 >
-                  {tab === 'invoicing' ? 'Invoicing' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  {tab === 'invoicing' ? 'Invoicing' : tab === 'invoices' ? 'Invoice Mgmt' : tab === 'parties' ? 'Parties' : tab.charAt(0).toUpperCase() + tab.slice(1)}
                 </button>
               ))}
             </nav>
@@ -326,6 +328,12 @@ export default function AdminDashboard() {
                       Vehicle Analytics
                     </button>
                     <button 
+                      onClick={() => setActiveTab('parties')}
+                      className="w-full bg-white border border-gray-300 text-gray-900 py-3 px-4 rounded-sm hover:bg-gray-50 transition-colors duration-200 text-sm font-medium"
+                    >
+                      Manage Parties
+                    </button>
+                    <button 
                       onClick={() => setActiveTab('whatsapp')}
                       className="w-full bg-white border border-gray-300 text-gray-900 py-3 px-4 rounded-sm hover:bg-gray-50 transition-colors duration-200 text-sm font-medium"
                     >
@@ -367,6 +375,14 @@ export default function AdminDashboard() {
 
           {activeTab === 'vehicles' && (
             <VehicleDashboard />
+          )}
+
+          {activeTab === 'invoices' && (
+            <InvoiceManagement />
+          )}
+
+          {activeTab === 'parties' && (
+            <PartyManagement />
           )}
 
           {activeTab === 'whatsapp' && (

@@ -1,12 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { VehicleAutocomplete } from '@/components/ui/VehicleAutocomplete';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { partiesApi } from '@/modules/parties/api';
+import { Party } from '@/modules/parties/types';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 
@@ -34,6 +37,19 @@ interface TripCreationFormProps {
 
 export function TripCreationForm({ vendorId, onSuccess }: TripCreationFormProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [parties, setParties] = useState<Party[]>([]);
+
+  useEffect(() => {
+    const fetchParties = async () => {
+      try {
+        const data = await partiesApi.getParties();
+        setParties(data);
+      } catch (error) {
+        console.error('Error fetching parties:', error);
+      }
+    };
+    fetchParties();
+  }, []);
   
   const {
     register,
@@ -145,11 +161,27 @@ export function TripCreationForm({ vendorId, onSuccess }: TripCreationFormProps)
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Party Name
             </label>
-            <Input
-              {...register('party')}
-              placeholder="e.g., ABC Corporation"
-              error={errors.party?.message}
+            <Controller
+              name="party"
+              control={control}
+              render={({ field }) => (
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <SelectTrigger className={errors.party ? 'border-destructive' : ''}>
+                    <SelectValue placeholder="Select a party" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {parties.map((party) => (
+                      <SelectItem key={party.id} value={party.name}>
+                        {party.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             />
+            {errors.party && (
+              <p className="mt-1 text-sm text-red-600">{errors.party.message}</p>
+            )}
           </div>
 
           <div>
