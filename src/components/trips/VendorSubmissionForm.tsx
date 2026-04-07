@@ -11,20 +11,38 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { partiesApi } from '@/modules/parties/api';
 import { Party } from '@/modules/parties/types';
 import toast from 'react-hot-toast';
-import axios from 'axios';
+import { api } from '@/lib/api';
 
-const vendorSubmissionSchema = z.object({
-  date: z.string().min(1, 'Date is required'),
-  partyName: z.string().min(1, 'Party name is required'),
-  fromLocation: z.string().min(1, 'From location is required'),
-  toLocation: z.string().min(1, 'To location is required'),
-  vehicleNumber: z.string().min(1, 'Vehicle number is required'),
-  initialExpense: z.number().optional(),
-  advance: z.number().optional(),
-  remarks: z.string().optional(),
-});
+function buildVendorSubmissionSchema(forAdmin: boolean) {
+  return z
+    .object({
+      vendorId: z.string().optional(),
+      date: z.string().min(1, 'Date is required'),
+      partyName: z.string().min(1, 'Party name is required'),
+      fromLocation: z.string().min(1, 'From location is required'),
+      toLocation: z.string().min(1, 'To location is required'),
+      vehicleNumber: z.string().min(1, 'Vehicle number is required'),
+      initialExpense: z.number().optional(),
+      advance: z.number().optional(),
+      remarks: z.string().optional(),
+    })
+    .superRefine((data, ctx) => {
+      if (forAdmin && !data.vendorId?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Vendor is required',
+          path: ['vendorId'],
+        });
+      }
+    });
+}
 
-type VendorSubmissionData = z.infer<typeof vendorSubmissionSchema>;
+type VendorSubmissionData = z.infer<ReturnType<typeof buildVendorSubmissionSchema>>;
+
+interface VendorOption {
+  id: string;
+  name: string;
+}
 
 interface VendorSubmissionResponse {
   success: boolean;
@@ -39,11 +57,22 @@ interface VendorSubmissionResponse {
 interface VendorSubmissionFormProps {
   onSave: (response?: VendorSubmissionResponse) => void;
   onCancel: () => void;
+  /** Admin: show vendor dropdown and send vendorId to the API. */
+  forAdmin?: boolean;
+  /** Use inside a modal: drop outer card max-width/padding wrapper. */
+  embedded?: boolean;
 }
 
-export function VendorSubmissionForm({ onSave, onCancel }: VendorSubmissionFormProps) {
+export function VendorSubmissionForm({
+  onSave,
+  onCancel,
+  forAdmin = false,
+  embedded = false,
+}: VendorSubmissionFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [parties, setParties] = useState<Party[]>([]);
+  const [vendors, setVendors] = useState<VendorOption[]>([]);
+  const [vendorsLoading, setVendorsLoading] = useState(false);
 
   useEffect(() => {
     const fetchParties = async () => {
@@ -74,6 +103,25 @@ export function VendorSubmissionForm({ onSave, onCancel }: VendorSubmissionFormP
     };
     fetchParties();
   }, []);
+
+  useEffect(() => {
+    if (!forAdmin) return;
+    const loadVendors = async () => {
+      setVendorsLoading(true);
+      try {
+        const token = localStorage.getItem('auth_token');
+        const res = await api.get<VendorOption[]>('/vendors', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setVendors(res.data ?? []);
+      } catch (e) {
+        console.error('VendorSubmissionForm: failed to load vendors', e);
+      } finally {
+        setVendorsLoading(false);
+      }
+    };
+    loadVendors();
+  }, [forAdmin]);
   
   const {
     register,
@@ -82,22 +130,24 @@ export function VendorSubmissionForm({ onSave, onCancel }: VendorSubmissionFormP
     reset,
     control,
   } = useForm<VendorSubmissionData>({
-    resolver: zodResolver(vendorSubmissionSchema),
+    resolver: zodResolver(buildVendorSubmissionSchema(forAdmin)),
     defaultValues: {
-      date: new Date().toISOString().split('T')[0], // Default to today
+      date: new Date().toISOString().split('T')[0],
+      vendorId: '',
     },
   });
 
   const onSubmit = async (data: VendorSubmissionData) => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('auth_token');
-      const headers = { Authorization: `Bearer ${token}` };
+      const payload: Record<string, unknown> = { ...data };
+      if (!forAdmin) {
+        delete payload.vendorId;
+      }
 
-      const response = await axios.post<VendorSubmissionResponse>(
-        `${process.env.NEXT_PUBLIC_API_URL}/trips/vendor-submission`,
-        data,
-        { headers }
+      const response = await api.post<VendorSubmissionResponse>(
+        '/trips/vendor-submission',
+        payload
       );
       
       const result = response.data;
@@ -111,14 +161,20 @@ export function VendorSubmissionForm({ onSave, onCancel }: VendorSubmissionFormP
       reset();
     } catch (error: any) {
       console.error('Vendor submission error:', error);
-      toast.error(error.response?.data?.message || 'Failed to submit trip');
+      const msg = error.response?.data?.message;
+      const detail = Array.isArray(msg) ? msg.join(', ') : msg;
+      toast.error(detail || 'Failed to submit trip');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const shellClass = embedded
+    ? ''
+    : 'max-w-4xl mx-auto p-4 sm:p-6 bg-white rounded-lg shadow-sm border border-border';
+
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-sm border border-border">
+    <div className={shellClass}>
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-foreground mb-2">Submit Trip Booking</h2>
         <p className="text-muted-foreground">Enter the basic trip details. Operations and billing information will be added later by the admin team.</p>
@@ -126,6 +182,48 @@ export function VendorSubmissionForm({ onSave, onCancel }: VendorSubmissionFormP
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {forAdmin && (
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Vendor *
+              </label>
+              {vendors.length > 0 ? (
+                <Controller
+                  name="vendorId"
+                  control={control}
+                  render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger className={errors.vendorId ? 'border-destructive' : ''}>
+                        <SelectValue placeholder="Select a vendor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {vendors.map((v) => (
+                          <SelectItem key={v.id} value={v.id}>
+                            {v.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              ) : (
+                <Input
+                  {...register('vendorId')}
+                  error={errors.vendorId?.message}
+                  placeholder="Vendor ID"
+                />
+              )}
+              {errors.vendorId && (
+                <p className="mt-1 text-sm text-destructive">{errors.vendorId.message}</p>
+              )}
+              {vendors.length === 0 && !vendorsLoading && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  No vendors loaded. Enter vendor ID manually or check Settings → Vendors.
+                </p>
+              )}
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
               Date *

@@ -50,7 +50,7 @@ export default function ShipperManagement() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this shipper?')) return;
-    
+
     try {
       await shipperApi.delete(id);
       alert('Shipper deleted successfully');
@@ -63,7 +63,7 @@ export default function ShipperManagement() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center mb-6">
+      <div className="mb-6 flex items-center justify-between">
         <h2 className="text-2xl font-bold">Shipper Management</h2>
         <Button onClick={() => setShowForm(!showForm)}>
           <Plus className="mr-2 h-4 w-4" />
@@ -72,38 +72,32 @@ export default function ShipperManagement() {
       </div>
 
       {showForm && (
-        <div className="bg-white p-6 rounded-lg border shadow-sm mb-6">
-          <h3 className="text-lg font-semibold mb-4">Create New Shipper</h3>
+        <div className="mb-6 rounded-lg border bg-white p-6 shadow-sm">
+          <h3 className="mb-4 text-lg font-semibold">Create New Shipper</h3>
           <form onSubmit={handleCreate} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Name</label>
+              <label className="mb-1 block text-sm font-medium">Name</label>
               <Input
                 value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Email</label>
+              <label className="mb-1 block text-sm font-medium">Email</label>
               <Input
                 type="email"
                 value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Password</label>
+              <label className="mb-1 block text-sm font-medium">Password</label>
               <Input
                 type="password"
                 value={formData.password}
-                onChange={(e) =>
-                  setFormData({ ...formData, password: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 required
                 minLength={6}
               />
@@ -116,24 +110,24 @@ export default function ShipperManagement() {
       )}
 
       {loading ? (
-        <div className="text-center py-8">Loading shippers...</div>
+        <div className="py-8 text-center">Loading shippers...</div>
       ) : (
-        <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
+        <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b">
+            <thead className="border-b bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                   Name
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                   Email
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-200 bg-white">
               {shippers.length === 0 ? (
                 <tr>
                   <td colSpan={3} className="px-6 py-8 text-center text-gray-500">
@@ -143,18 +137,16 @@ export default function ShipperManagement() {
               ) : (
                 shippers.map((shipper) => (
                   <tr key={shipper.id}>
-                    <td className="px-6 py-4 whitespace-nowrap font-medium">
-                      {shipper.name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {shipper.email}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <td className="whitespace-nowrap px-6 py-4 font-medium">{shipper.name}</td>
+                    <td className="whitespace-nowrap px-6 py-4">{shipper.email}</td>
+                    <td className="whitespace-nowrap px-6 py-4 text-right">
                       <button
+                        type="button"
                         onClick={() => handleDelete(shipper.id)}
                         className="text-red-600 hover:text-red-900"
+                        aria-label="Delete shipper"
                       >
-                        <Trash2 className="h-4 w-4 inline" />
+                        <Trash2 className="inline h-4 w-4" />
                       </button>
                     </td>
                   </tr>

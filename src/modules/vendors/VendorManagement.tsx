@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Phone, Mail, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { VendorForm } from './VendorForm';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
@@ -119,9 +118,9 @@ export function VendorManagement({ onEdit }: VendorManagementProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold text-foreground">Vendor Management</h2>
-        <Button onClick={handleCreateVendor}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-xl sm:text-2xl font-semibold text-foreground">Vendor Management</h2>
+        <Button onClick={handleCreateVendor} className="w-full sm:w-auto shrink-0">
           <Plus className="mr-2 h-4 w-4" />
           Add Vendor
         </Button>
@@ -129,18 +128,18 @@ export function VendorManagement({ onEdit }: VendorManagementProps) {
 
       {/* Vendor Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4">
-            <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between p-6 border-b border-border">
-                <h2 className="text-xl font-semibold text-foreground">
+        <div className="fixed inset-0 z-50 overflow-y-auto px-safe pt-safe pb-safe">
+          <div className="flex min-h-full items-center justify-center p-2 sm:p-4">
+            <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90dvh] sm:max-h-[90vh] overflow-y-auto mx-auto">
+              <div className="flex items-center justify-between p-4 sm:p-6 border-b border-border">
+                <h2 className="text-lg sm:text-xl font-semibold text-foreground pr-2">
                   {selectedVendor ? 'Edit Vendor' : 'Create New Vendor'}
                 </h2>
                 <Button variant="ghost" onClick={handleCloseForm}>
                   ×
                 </Button>
               </div>
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 <VendorForm
                   vendor={selectedVendor}
                   onSave={handleCloseForm}

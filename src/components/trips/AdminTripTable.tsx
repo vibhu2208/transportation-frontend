@@ -176,13 +176,13 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
 
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="text-lg font-medium text-gray-900">Transportation Operations Register</h3>
+      <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
+        <h3 className="text-base sm:text-lg font-medium text-gray-900">Transportation Operations Register</h3>
         <p className="mt-1 text-sm text-gray-500">Complete lifecycle view of all trips with operational and financial data</p>
       </div>
 
       {/* Filters Section */}
-      <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+      <div className="px-4 sm:px-6 py-4 bg-gray-50 border-b border-gray-200">
         <div className="flex items-center justify-between mb-4">
           <h4 className="text-sm font-medium text-gray-900">Filter Trips</h4>
           <button
@@ -251,52 +251,84 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
         )}
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trip No</th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vendor</th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Party</th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">From</th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">To</th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vehicle</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+      {filteredTrips.length > 0 && (
+        <>
+          <div className="md:hidden px-4 py-4 space-y-3 bg-white border-t border-gray-200">
             {filteredTrips.map((trip) => (
-              <tr 
+              <button
                 key={trip.tripNo}
-                className="hover:bg-gray-50 cursor-pointer" 
+                type="button"
+                className="w-full text-left rounded-lg border border-gray-200 p-4 shadow-sm hover:bg-gray-50 active:bg-gray-100 transition-colors"
                 onClick={() => setShowTripModal(trip)}
               >
-                <td className="px-2 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {trip.tripNo}
-                </td>
-                <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-500">
-                  {trip.date}
-                </td>
-                <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-900">
-                  {trip.vendorName}
-                </td>
-                <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-900">
-                  {trip.partyName}
-                </td>
-                <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-900">
-                  {trip.fromLocation}
-                </td>
-                <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-900">
-                  {trip.toLocation}
-                </td>
-                <td className="px-2 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {trip.vehicleNumber}
-                </td>
-              </tr>
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-sm font-semibold text-gray-900">{trip.tripNo}</span>
+                  <span className={`shrink-0 inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${getStatusColor(trip.status)}`}>
+                    {getStatusDisplay(trip.status)}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">{trip.date}</p>
+                <p className="text-sm text-gray-800 mt-2 line-clamp-2">{trip.partyName}</p>
+                <p className="text-xs text-gray-600 mt-1">
+                  {trip.fromLocation} → {trip.toLocation}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600">
+                  <span>{trip.vehicleNumber}</span>
+                  <span className="text-gray-400">|</span>
+                  <span className="truncate max-w-[12rem]">{trip.vendorName}</span>
+                </div>
+              </button>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </div>
+
+          <div className="hidden md:block table-scroll-bleed border-t border-gray-200">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
+                <tr>
+                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trip No</th>
+                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vendor</th>
+                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Party</th>
+                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">From</th>
+                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">To</th>
+                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vehicle</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredTrips.map((trip) => (
+                  <tr
+                    key={trip.tripNo}
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => setShowTripModal(trip)}
+                  >
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {trip.tripNo}
+                    </td>
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-sm text-gray-500">
+                      {trip.date}
+                    </td>
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-sm text-gray-900">
+                      {trip.vendorName}
+                    </td>
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-sm text-gray-900">
+                      {trip.partyName}
+                    </td>
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-sm text-gray-900">
+                      {trip.fromLocation}
+                    </td>
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-sm text-gray-900">
+                      {trip.toLocation}
+                    </td>
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {trip.vehicleNumber}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {filteredTrips.length === 0 && (
         <div className="text-center py-12">
@@ -316,11 +348,11 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
 
       {/* Trip Detail Modal */}
       {showTripModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-4/5 lg:w-3/4 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Trip Details - {showTripModal.tripNo}</h3>
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 px-2 sm:px-4 py-4 sm:py-8">
+          <div className="relative mx-auto p-4 sm:p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white max-h-[calc(100dvh-2rem)] overflow-y-auto">
+            <div className="mt-0 sm:mt-1">
+              <div className="flex justify-between items-start gap-2 mb-4">
+                <h3 className="text-base sm:text-lg font-medium text-gray-900 pr-2">Trip Details - {showTripModal.tripNo}</h3>
                 <button
                   onClick={() => setShowTripModal(null)}
                   className="text-gray-400 hover:text-gray-500"
@@ -449,13 +481,13 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                 {/* Actions */}
                 <div className="col-span-1 md:col-span-2 lg:col-span-3">
                   <h4 className="font-semibold text-gray-900 mb-3 border-b pb-2">Actions</h4>
-                  <div className="flex flex-wrap gap-3">
+                  <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3">
                     <button
                       onClick={() => {
                         handleOperationsUpdate(showTripModal);
                         setShowTripModal(null);
                       }}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-sm hover:bg-blue-700 transition-colors text-sm font-medium"
+                      className="bg-blue-600 text-white px-4 py-2 rounded-sm hover:bg-blue-700 transition-colors text-sm font-medium w-full sm:w-auto"
                     >
                       Update Operations
                     </button>
@@ -464,7 +496,7 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                         handleAccountsUpdate(showTripModal);
                         setShowTripModal(null);
                       }}
-                      className="bg-green-600 text-white px-4 py-2 rounded-sm hover:bg-green-700 transition-colors text-sm font-medium"
+                      className="bg-green-600 text-white px-4 py-2 rounded-sm hover:bg-green-700 transition-colors text-sm font-medium w-full sm:w-auto"
                     >
                       Update Accounts
                     </button>
@@ -472,7 +504,7 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                       onClick={() => {
                         toggleExpand(showTripModal);
                       }}
-                      className="bg-purple-600 text-white px-4 py-2 rounded-sm hover:bg-purple-700 transition-colors text-sm font-medium"
+                      className="bg-purple-600 text-white px-4 py-2 rounded-sm hover:bg-purple-700 transition-colors text-sm font-medium w-full sm:w-auto"
                     >
                       View GR Details
                     </button>

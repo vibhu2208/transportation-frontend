@@ -110,4 +110,21 @@
     font-weight: 700;
     font-style: italic;
   }
+
+  /* Safe areas for notched phones (optional utility classes) */
+  .pb-safe {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+  .pt-safe {
+    padding-top: max(0.5rem, env(safe-area-inset-top));
+  }
+  .px-safe {
+    padding-left: max(0.5rem, env(safe-area-inset-left));
+    padding-right: max(0.5rem, env(safe-area-inset-right));
+  }
+
+  /* Horizontal scroll for data tables on small screens (touch-friendly) */
+  .table-scroll-bleed {
+    @apply -mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto;
+  }
 }

@@ -57,18 +57,18 @@ export function VehicleDashboard() {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* Header & Search */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 border border-gray-200 rounded-sm">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">Vehicle Fleet Overview</h2>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 sm:p-6 border border-gray-200 rounded-sm">
+        <div className="min-w-0">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Vehicle Fleet Overview</h2>
           <p className="text-sm text-gray-500 mt-1">Manage and monitor your vehicle performance</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="relative group">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+          <div className="relative group w-full md:w-auto">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-green-600 transition-colors" />
             <input
               type="text"
               placeholder="Search vehicle number..."
-              className="pl-10 pr-4 py-2 border border-gray-200 rounded-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 min-w-[280px] text-sm"
+              className="w-full md:min-w-[200px] md:max-w-xs pl-10 pr-4 py-2 border border-gray-200 rounded-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />

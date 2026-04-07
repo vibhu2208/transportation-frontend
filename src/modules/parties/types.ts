@@ -8,6 +8,7 @@ export interface Party {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  remainingBalance?: number;
   _count?: {
     trips: number;
     invoices: number;

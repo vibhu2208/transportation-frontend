@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { tripsApi, goodsReceiptApi } from '@/lib/api-client';
-import GoodsReceiptForm from './GoodsReceiptForm';
+import { GREditModal } from '../trips/GREditModal';
 
 interface Trip {
   id: string;
@@ -65,17 +65,21 @@ export default function ShipperDashboard() {
   if (selectedTrip) {
     return (
       <div>
-        <Button onClick={() => setSelectedTrip(null)} className="mb-4">
-          ← Back to Trips
-        </Button>
-        <GoodsReceiptForm trip={selectedTrip} onComplete={handleFormComplete} />
+        <GREditModal
+          trip={selectedTrip}
+          existingGR={undefined}
+          onSave={handleFormComplete}
+          onCancel={() => setSelectedTrip(null)}
+          // Shipper flow has no extra "back" step; cancel closes the modal.
+          onBack={() => setSelectedTrip(null)}
+        />
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-bold mb-6">Select a Trip</h2>
+      <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Select a Trip</h2>
 
       {loading ? (
         <div className="text-center py-8">Loading trips...</div>
@@ -89,9 +93,9 @@ export default function ShipperDashboard() {
             trips.map((trip) => (
               <div
                 key={trip.id}
-                className="bg-white p-6 rounded-lg border shadow-sm hover:shadow-md transition-shadow"
+                className="bg-white p-4 sm:p-6 rounded-lg border shadow-sm hover:shadow-md transition-shadow"
               >
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-4">
                   <div>
                     <div className="text-sm text-gray-500">Trip No</div>
                     <div className="font-semibold">{trip.tripNo}</div>
@@ -121,7 +125,7 @@ export default function ShipperDashboard() {
                     <div className="font-medium">{trip.toLocation}</div>
                   </div>
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   {trip.hasGR ? (
                     <div className="flex items-center space-x-2">
                       <div className="w-3 h-3 bg-green-500 rounded-full"></div>
@@ -135,7 +139,7 @@ export default function ShipperDashboard() {
                   )}
                   <Button 
                     onClick={() => handleSelectTrip(trip)} 
-                    className={trip.hasGR ? "bg-gray-500 hover:bg-gray-600" : ""}
+                    className={`w-full sm:w-auto shrink-0 ${trip.hasGR ? "bg-gray-500 hover:bg-gray-600" : ""}`}
                     disabled={trip.hasGR}
                   >
                     {trip.hasGR ? 'GR Completed' : 'Fill GR Form'}

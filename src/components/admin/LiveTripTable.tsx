@@ -122,14 +122,14 @@ export function LiveTripTable({ refreshInterval = 30 }: LiveTripTableProps) {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">Live Trip Dashboard</h2>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Live Trip Dashboard</h2>
           <p className="text-sm text-gray-500">
             Last updated: {format(lastRefresh, 'HH:mm:ss')} • {trips.length} trips
           </p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:space-x-2">
           <label className="flex items-center text-sm text-gray-600">
             <input
               type="checkbox"
@@ -144,6 +144,7 @@ export function LiveTripTable({ refreshInterval = 30 }: LiveTripTableProps) {
             disabled={isLoading}
             size="sm"
             variant="outline"
+            className="w-full sm:w-auto"
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
@@ -151,28 +152,69 @@ export function LiveTripTable({ refreshInterval = 30 }: LiveTripTableProps) {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
+      {/* Mobile cards */}
+      <div className="md:hidden space-y-3">
+        {isLoading ? (
+          <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-500">
+            <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2" />
+            Loading trips...
+          </div>
+        ) : trips.length === 0 ? (
+          <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-500">No trips found</div>
+        ) : (
+          trips.map((trip) => (
+            <div
+              key={trip.id}
+              className={`rounded-lg border border-gray-200 bg-white p-4 shadow-sm ${trip.duplicateFlag ? 'border-red-200 bg-red-50/50' : ''}`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    {trip.duplicateFlag && <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />}
+                    <span className="text-sm font-semibold text-gray-900">{trip.tripNo}</span>
+                  </div>
+                  {trip.party && <p className="text-xs text-gray-500 mt-1">Party: {trip.party}</p>}
+                </div>
+                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${getStatusColor(trip.status)}`}>
+                  {getStatusIcon(trip.status)}
+                  <span className="ml-1">{trip.status.replace('_', ' ')}</span>
+                </span>
+              </div>
+              <p className="mt-2 text-xs text-gray-600">{trip.vendor.name}</p>
+              <p className="text-sm font-medium text-gray-900 mt-1">{trip.vehicleNumber}</p>
+              <p className="text-xs text-gray-700 mt-1">
+                {trip.startLocation} → {trip.endLocation}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                {format(new Date(trip.startTime), 'MMM dd, HH:mm')} · {format(new Date(trip.createdAt), 'HH:mm:ss')}
+              </p>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Table — md+ */}
+      <div className="hidden md:block bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
+        <div className="table-scroll-bleed overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Trip Details
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Vendor
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Vehicle
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Route
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Submission Time
                 </th>
               </tr>
@@ -180,21 +222,21 @@ export function LiveTripTable({ refreshInterval = 30 }: LiveTripTableProps) {
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={6} className="px-3 sm:px-6 py-4 text-center text-gray-500">
                     <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2" />
                     Loading trips...
                   </td>
                 </tr>
               ) : trips.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={6} className="px-3 sm:px-6 py-4 text-center text-gray-500">
                     No trips found
                   </td>
                 </tr>
               ) : (
                 trips.map((trip) => (
                   <tr key={trip.id} className={trip.duplicateFlag ? 'bg-red-50' : ''}>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         {trip.duplicateFlag && (
                           <AlertTriangle className="w-4 h-4 text-red-500 mr-2" />
@@ -211,16 +253,16 @@ export function LiveTripTable({ refreshInterval = 30 }: LiveTripTableProps) {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{trip.vendor.name}</div>
                       <div className="text-sm text-gray-500">{trip.vendor.email}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
                         {trip.vehicleNumber}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
                         {trip.startLocation} → {trip.endLocation}
                       </div>
@@ -228,7 +270,7 @@ export function LiveTripTable({ refreshInterval = 30 }: LiveTripTableProps) {
                         {format(new Date(trip.startTime), 'MMM dd, HH:mm')}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         {getStatusIcon(trip.status)}
                         <span className={`ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(trip.status)}`}>
@@ -241,7 +283,7 @@ export function LiveTripTable({ refreshInterval = 30 }: LiveTripTableProps) {
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {format(new Date(trip.createdAt), 'MMM dd, HH:mm:ss')}
                     </td>
                   </tr>

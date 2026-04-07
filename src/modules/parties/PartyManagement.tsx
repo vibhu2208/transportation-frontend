@@ -113,14 +113,14 @@ export default function PartyManagement() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Party Management</h1>
-        <div className="flex gap-2">
-          <Button onClick={handleSync} variant="outline" disabled={syncing}>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl sm:text-3xl font-bold">Party Management</h1>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-2">
+          <Button onClick={handleSync} variant="outline" disabled={syncing} className="w-full sm:w-auto">
             {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
             Sync from Trips
           </Button>
-          <Button onClick={() => { setShowForm(true); setIsEditing(false); setCurrentParty(null); }}>
+          <Button onClick={() => { setShowForm(true); setIsEditing(false); setCurrentParty(null); }} className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             Add Party
           </Button>
@@ -251,6 +251,12 @@ export default function PartyManagement() {
                   <div className="text-center flex-1">
                     <div className="font-bold">{party._count?.invoices || 0}</div>
                     <div className="text-xs text-muted-foreground uppercase">Invoices</div>
+                  </div>
+                  <div className="text-center flex-1">
+                    <div className="font-bold">
+                      ₹{(party.remainingBalance ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                    </div>
+                    <div className="text-xs text-muted-foreground uppercase">Remaining</div>
                   </div>
                 </div>
               </div>
