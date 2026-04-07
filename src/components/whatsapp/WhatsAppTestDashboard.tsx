@@ -13,7 +13,7 @@ interface WhatsAppMessage {
   processed: boolean;
 }
 
-export function WhatsAppTestDashboard() {
+export default function WhatsAppTestDashboard() {
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
   const [isListening, setIsListening] = useState(false);
   const [testCredentials, setTestCredentials] = useState({

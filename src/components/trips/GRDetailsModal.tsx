@@ -103,6 +103,12 @@ export function GRDetailsModal({ trip, grData, onClose, onRefresh }: GRDetailsMo
     }
   };
 
+  const normalizeAmount = (value?: string | null) => {
+    if (!value) return 0;
+    const parsed = parseFloat(value.toString().replace(/[^\d.-]/g, ''));
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
   if (showEditModal) {
     return (
       <GREditModal
@@ -195,12 +201,22 @@ export function GRDetailsModal({ trip, grData, onClose, onRefresh }: GRDetailsMo
                     </div>
                     <div>
                       <span className="font-medium text-gray-600">Freight:</span>
-                      <p className="text-gray-900">₹{gr.freight}</p>
+                      <p className="text-gray-900">₹{gr.freight || '-'}</p>
                     </div>
-                    <div>
-                      <span className="font-medium text-gray-600">Total Freight:</span>
-                      <p className="text-gray-900">₹{gr.totalFreight || '-'}</p>
-                    </div>
+                    {gr.toll && normalizeAmount(gr.toll) > 0 && (
+                      <div>
+                        <span className="font-medium text-gray-600">Toll:</span>
+                        <p className="text-gray-900">₹{gr.toll}</p>
+                      </div>
+                    )}
+                    {gr.totalFreight &&
+                      normalizeAmount(gr.totalFreight) > 0 &&
+                      normalizeAmount(gr.totalFreight) !== normalizeAmount(gr.freight) && (
+                        <div>
+                          <span className="font-medium text-gray-600">Total Freight:</span>
+                          <p className="text-gray-900">₹{gr.totalFreight}</p>
+                        </div>
+                      )}
                     <div>
                       <span className="font-medium text-gray-600">GST:</span>
                       <p className="text-gray-900">₹{gr.gst || '-'}</p>
@@ -222,8 +238,28 @@ export function GRDetailsModal({ trip, grData, onClose, onRefresh }: GRDetailsMo
                       <p className="text-gray-900">{gr.gstPaidBy}</p>
                     </div>
                     <div>
-                      <span className="font-medium text-gray-600">Account:</span>
-                      <p className="text-gray-900">{gr.account}</p>
+                      <span className="font-medium text-gray-600">Shipment ID:</span>
+                      <p className="text-gray-900">{gr.shipmentId || '-'}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600">GR No:</span>
+                      <p className="text-gray-900">{gr.grNo || '-'}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600">Detention Loading:</span>
+                      <p className="text-gray-900">{gr.detentionLoading || '-'}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600">Detention U/L:</span>
+                      <p className="text-gray-900">{gr.detentionUL || '-'}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600">Labour Charges:</span>
+                      <p className="text-gray-900">{gr.labourCharges || '-'}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600">Other Charges:</span>
+                      <p className="text-gray-900">{gr.otherCharges || '-'}</p>
                     </div>
                     <div>
                       <span className="font-medium text-gray-600">GR Created:</span>

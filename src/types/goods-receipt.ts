@@ -26,7 +26,6 @@ export interface GoodsReceipt {
   partySlab?: string;
   distanceKm?: string;
   
-  partyBillNo: string;
   partyBillDate?: string;
   netInvValue?: string;
   
@@ -57,6 +56,7 @@ export interface GoodsReceipt {
   gst?: string;
   advanceDate?: string;
   ewayDate?: string;
+  toll?: string;
   netPayable?: string;
   
   fromStationUp?: string;
@@ -64,6 +64,12 @@ export interface GoodsReceipt {
   driverName?: string;
   poNo?: string;
   shipmentId?: string;
+  
+  grNo?: string;
+  detentionLoading?: string;
+  detentionUL?: string;
+  labourCharges?: string;
+  otherCharges?: string;
   
   expenses?: ExpenseItem[];
   grPhotoUrl?: string;
@@ -99,7 +105,6 @@ export interface CreateGoodsReceiptDto {
   partySlab?: string;
   distanceKm?: string;
   
-  partyBillNo: string;
   partyBillDate?: string;
   netInvValue?: string;
   
@@ -130,6 +135,7 @@ export interface CreateGoodsReceiptDto {
   gst?: string;
   advanceDate?: string;
   ewayDate?: string;
+  toll?: string;
   netPayable?: string;
   
   fromStationUp?: string;
@@ -137,6 +143,12 @@ export interface CreateGoodsReceiptDto {
   driverName?: string;
   poNo?: string;
   shipmentId?: string;
+  
+  grNo?: string;
+  detentionLoading?: string;
+  detentionUL?: string;
+  labourCharges?: string;
+  otherCharges?: string;
   
   expenses?: ExpenseItem[];
   grPhotoUrl?: string;

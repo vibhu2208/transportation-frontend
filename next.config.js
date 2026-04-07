@@ -4,10 +4,16 @@ const nextConfig = {
   swcMinify: true,
   // PWA Configuration
   async rewrites() {
+    const backendUrl = (process.env.BACKEND_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
     return [
       {
         source: '/sw.js',
         destination: '/_next/static/chunks/sw.js',
+      },
+      // Browser calls same origin → Next forwards to Nest (fixes "Cannot POST" when API URL pointed at Next by mistake)
+      {
+        source: '/api-backend/:path*',
+        destination: `${backendUrl}/:path*`,
       },
     ];
   },
