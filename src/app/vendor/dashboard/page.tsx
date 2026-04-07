@@ -68,16 +68,16 @@ export default function VendorDashboard() {
 
   return (
     <ProtectedRoute allowedRoles={[UserRole.VENDOR]}>
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-white p-6">
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-white p-4 sm:p-6">
         <div className="max-w-7xl mx-auto">
-          <div className="mb-8 flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Vendor Dashboard</h1>
-              <p className="text-muted-foreground mt-2">Manage your trips and vehicles</p>
+          <div className="mb-6 sm:mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Vendor Dashboard</h1>
+              <p className="text-muted-foreground mt-2 text-sm sm:text-base">Manage your trips and vehicles</p>
             </div>
             <button
               onClick={handleLogout}
-              className="bg-destructive text-destructive-foreground px-4 py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center gap-2 shadow-sm"
+              className="w-full sm:w-auto justify-center bg-destructive text-destructive-foreground px-4 py-2 rounded-lg hover:bg-red-600 transition-colors inline-flex items-center gap-2 shadow-sm shrink-0"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -87,11 +87,11 @@ export default function VendorDashboard() {
           </div>
 
           {/* Navigation Tabs */}
-          <div className="border-b border-border bg-white rounded-t-lg shadow-sm mb-8">
-            <nav className="-mb-px flex space-x-8 px-6">
+          <div className="border-b border-border bg-white rounded-t-lg shadow-sm mb-6 sm:mb-8 overflow-x-auto overscroll-x-contain touch-pan-x [-webkit-overflow-scrolling:touch]">
+            <nav className="-mb-px flex min-w-max gap-6 sm:gap-8 px-4 sm:px-6">
               <button
                 onClick={() => setActiveTab('overview')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                className={`shrink-0 py-3 sm:py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === 'overview'
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
@@ -101,7 +101,7 @@ export default function VendorDashboard() {
               </button>
               <button
                 onClick={() => setActiveTab('create')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                className={`shrink-0 py-3 sm:py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === 'create'
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
@@ -111,7 +111,7 @@ export default function VendorDashboard() {
               </button>
               <button
                 onClick={() => setActiveTab('manage')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                className={`shrink-0 py-3 sm:py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === 'manage'
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'

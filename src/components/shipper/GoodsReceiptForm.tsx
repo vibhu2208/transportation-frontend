@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import ImageUpload from '@/components/ui/ImageUpload';
 import { goodsReceiptApi } from '@/lib/api-client';
-import { CreateGoodsReceiptDto, ExpenseItem } from '@/types/goods-receipt';
+import { CreateGoodsReceiptDto } from '@/types/goods-receipt';
 
 interface Trip {
   id: string;
@@ -23,35 +23,28 @@ interface Props {
 
 export default function GoodsReceiptForm({ trip, onComplete }: Props) {
   const [loading, setLoading] = useState(false);
-  const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
   const [grBiltyImages, setGrBiltyImages] = useState<string[]>([]);
   const [formData, setFormData] = useState<Partial<CreateGoodsReceiptDto>>({
     tripId: trip.id,
     cnNo: trip.tripNo,
     cnDate: new Date().toISOString().split('T')[0],
     cnTime: new Date().toLocaleTimeString(),
+    // Shipper-side UI should match Admin's "Essential Invoice Fields"
+    // (detention + labour/other charges are mandatory for creating GR)
+    grNo: '',
     truckLorryNo: trip.vehicleNumber,
     agentTruck: trip.vehicleNumber,
     fromStation: trip.fromLocation,
     toStation: trip.toLocation,
+    detentionLoading: '',
+    detentionUL: '',
+    toll: '',
+    labourCharges: '',
+    otherCharges: '',
   });
 
   const handleInputChange = (field: string, value: string) => {
     setFormData({ ...formData, [field]: value });
-  };
-
-  const handleAddExpense = () => {
-    setExpenses([...expenses, { expense: '', amount: '', narration: '' }]);
-  };
-
-  const handleExpenseChange = (index: number, field: keyof ExpenseItem, value: string) => {
-    const newExpenses = [...expenses];
-    newExpenses[index][field] = value;
-    setExpenses(newExpenses);
-  };
-
-  const handleRemoveExpense = (index: number) => {
-    setExpenses(expenses.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -70,7 +63,6 @@ export default function GoodsReceiptForm({ trip, onComplete }: Props) {
       const submitData: CreateGoodsReceiptDto = {
         ...formData,
         shipperId: user.id,
-        expenses: expenses.filter(e => e.expense && e.amount),
         grBiltyImages: grBiltyImages,
       } as CreateGoodsReceiptDto;
 
@@ -127,15 +119,15 @@ export default function GoodsReceiptForm({ trip, onComplete }: Props) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">CN No./TRIP NO *</label>
+            <label className="block text-sm font-medium mb-1">GR No. *</label>
             <Input
-              value={formData.cnNo || ''}
-              onChange={(e) => handleInputChange('cnNo', e.target.value)}
+              value={formData.grNo || ''}
+              onChange={(e) => handleInputChange('grNo', e.target.value)}
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">CN Date *</label>
+            <label className="block text-sm font-medium mb-1">Date *</label>
             <Input
               type="date"
               value={formData.cnDate || ''}
@@ -144,7 +136,7 @@ export default function GoodsReceiptForm({ trip, onComplete }: Props) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">CN Time *</label>
+            <label className="block text-sm font-medium mb-1">Time *</label>
             <Input
               type="time"
               value={formData.cnTime || ''}
@@ -258,7 +250,7 @@ export default function GoodsReceiptForm({ trip, onComplete }: Props) {
         <h3 className="text-lg font-semibold border-b pb-2">Vehicle / Transport Details</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Truck/Lorry No *</label>
+            <label className="block text-sm font-medium mb-1">Vehicle No *</label>
             <Input
               value={formData.truckLorryNo || ''}
               onChange={(e) => handleInputChange('truckLorryNo', e.target.value)}
@@ -311,6 +303,46 @@ export default function GoodsReceiptForm({ trip, onComplete }: Props) {
               required
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Detention Loading *</label>
+            <Input
+              value={formData.detentionLoading || ''}
+              onChange={(e) => handleInputChange('detentionLoading', e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Detention U/L *</label>
+            <Input
+              value={formData.detentionUL || ''}
+              onChange={(e) => handleInputChange('detentionUL', e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Toll</label>
+            <Input
+              value={formData.toll || ''}
+              onChange={(e) => handleInputChange('toll', e.target.value)}
+              placeholder="Toll charges"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Labour Charges *</label>
+            <Input
+              value={formData.labourCharges || ''}
+              onChange={(e) => handleInputChange('labourCharges', e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Other Charges *</label>
+            <Input
+              value={formData.otherCharges || ''}
+              onChange={(e) => handleInputChange('otherCharges', e.target.value)}
+              required
+            />
+          </div>
         </div>
       </section>
 
@@ -319,7 +351,7 @@ export default function GoodsReceiptForm({ trip, onComplete }: Props) {
         <h3 className="text-lg font-semibold border-b pb-2">Package / Goods Details</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Package *</label>
+            <label className="block text-sm font-medium mb-1">No. of Boxes *</label>
             <Input
               value={formData.package || ''}
               onChange={(e) => handleInputChange('package', e.target.value)}
@@ -534,51 +566,6 @@ export default function GoodsReceiptForm({ trip, onComplete }: Props) {
           maxImages={5}
           label="Upload GR/Bilty Images"
         />
-      </section>
-
-      {/* Expense Section */}
-      <section className="space-y-4">
-        <div className="flex justify-between items-center border-b pb-2">
-          <h3 className="text-lg font-semibold">Expense Section</h3>
-          <Button type="button" onClick={handleAddExpense} size="sm">
-            Add Expense
-          </Button>
-        </div>
-        {expenses.map((expense, index) => (
-          <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded">
-            <div>
-              <label className="block text-sm font-medium mb-1">Expense</label>
-              <Input
-                value={expense.expense}
-                onChange={(e) => handleExpenseChange(index, 'expense', e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Amount</label>
-              <Input
-                value={expense.amount}
-                onChange={(e) => handleExpenseChange(index, 'amount', e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Narration</label>
-              <Input
-                value={expense.narration}
-                onChange={(e) => handleExpenseChange(index, 'narration', e.target.value)}
-              />
-            </div>
-            <div className="flex items-end">
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                onClick={() => handleRemoveExpense(index)}
-              >
-                Remove
-              </Button>
-            </div>
-          </div>
-        ))}
       </section>
 
       <div className="flex gap-4 pt-6">

@@ -193,15 +193,15 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-5 mx-auto p-5 border w-11/12 shadow-lg rounded-md bg-white max-h-[95vh] overflow-y-auto">
-        <div className="mt-3">
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center space-x-3">
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 px-2 sm:px-4 py-3 sm:py-6 flex items-start justify-center">
+      <div className="relative mx-auto p-4 sm:p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white max-h-[90dvh] sm:max-h-[95vh] overflow-y-auto">
+        <div className="mt-0 sm:mt-1">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-4 w-full">
+            <div className="flex items-start space-x-3 min-w-0 flex-1">
               {onBack && (
                 <button
                   onClick={onBack}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-400 hover:text-gray-600 shrink-0 mt-0.5"
                   title="Back to GR details"
                 >
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -209,8 +209,8 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
                   </svg>
                 </button>
               )}
-              <div>
-                <h3 className="text-lg font-medium text-gray-900">
+              <div className="min-w-0">
+                <h3 className="text-base sm:text-lg font-medium text-gray-900 break-words">
                   {isEditing ? 'Edit GR Details' : 'Add GR Details'} - Trip {trip.tripNo}
                 </h3>
                 <p className="text-sm text-gray-500">
@@ -220,7 +220,7 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
             </div>
             <button
               onClick={onCancel}
-              className="text-gray-400 hover:text-gray-500"
+              className="text-gray-400 hover:text-gray-500 shrink-0 p-1"
             >
               <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

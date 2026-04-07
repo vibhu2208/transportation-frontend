@@ -63,9 +63,9 @@ export function OperationsUpdateModal({ tripId, tripNo, currentData, onSave, onC
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
-        <div className="mt-3">
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 px-2 sm:px-4 py-4 sm:py-8 flex items-start justify-center">
+      <div className="relative my-auto p-4 sm:p-5 border w-full max-w-lg shadow-lg rounded-md bg-white max-h-[90dvh] overflow-y-auto">
+        <div className="mt-0 sm:mt-1">
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center space-x-3">
               {onBack && (

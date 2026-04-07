@@ -106,6 +106,7 @@ export interface CreateGoodsReceiptDto {
   distanceKm?: string;
   
   partyBillDate?: string;
+  partyBillNo?: string;
   netInvValue?: string;
   
   truckLorryNo: string;

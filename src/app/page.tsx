@@ -94,7 +94,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative">
+    <div className="min-h-screen bg-white flex flex-col justify-center py-8 sm:py-12 px-4 sm:px-6 lg:px-8 relative">
       {/* Background geometric pattern */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-full">
@@ -105,7 +105,7 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="relative z-10 sm:mx-auto sm:w-full sm:max-w-lg">
+      <div className="relative z-10 w-full max-w-lg mx-auto">
         {/* Logo and branding */}
         <div className="flex flex-col items-center mb-10">
           <div className="w-24 h-24 bg-emerald-600 flex items-center justify-center shadow-2xl mb-6 border-4 border-white">
@@ -113,7 +113,7 @@ export default function Home() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
             </svg>
           </div>
-          <h1 className="text-4xl font-black text-gray-900 text-center tracking-tight">
+          <h1 className="text-3xl sm:text-4xl font-black text-gray-900 text-center tracking-tight px-2">
             TRANSPORT<span className="text-emerald-600">PRO</span>
           </h1>
           <p className="mt-4 text-center text-gray-700 text-lg font-semibold uppercase tracking-wide">
@@ -127,7 +127,7 @@ export default function Home() {
         </div>
 
         {/* Main login card */}
-        <div className="bg-white py-10 px-10 shadow-2xl border-4 border-gray-200">
+        <div className="bg-white py-6 px-4 sm:py-10 sm:px-10 shadow-2xl border-4 border-gray-200">
           <div className="mb-8">
             <div className="w-full h-1 bg-emerald-600 mb-6"></div>
             <h2 className="text-3xl font-black text-gray-900 text-center mb-3 uppercase tracking-wide">
@@ -151,34 +151,34 @@ export default function Home() {
               </h3>
               <div className="space-y-4">
                 <div className="bg-white p-4 border-2 border-emerald-200">
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
                     <div>
                       <span className="font-black text-gray-900 text-sm uppercase">ADMIN</span>
                       <p className="text-xs text-gray-600 font-semibold uppercase tracking-wide">FULL SYSTEM ACCESS</p>
                     </div>
-                    <code className="bg-emerald-100 text-emerald-800 px-3 py-2 text-xs font-mono font-bold border border-emerald-300">
+                    <code className="bg-emerald-100 text-emerald-800 px-3 py-2 text-xs font-mono font-bold border border-emerald-300 break-all">
                       admin@transport.com
                     </code>
                   </div>
                 </div>
                 <div className="bg-white p-4 border-2 border-green-200">
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
                     <div>
                       <span className="font-black text-gray-900 text-sm uppercase">VENDOR 1</span>
                       <p className="text-xs text-gray-600 font-semibold uppercase tracking-wide">TRANSPORT COMPANY</p>
                     </div>
-                    <code className="bg-green-100 text-green-800 px-3 py-2 text-xs font-mono font-bold border border-green-300">
+                    <code className="bg-green-100 text-green-800 px-3 py-2 text-xs font-mono font-bold border border-green-300 break-all">
                       vendor1@transport.com
                     </code>
                   </div>
                 </div>
                 <div className="bg-white p-4 border-2 border-emerald-300">
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
                     <div>
                       <span className="font-black text-gray-900 text-sm uppercase">VENDOR 2</span>
                       <p className="text-xs text-gray-600 font-semibold uppercase tracking-wide">LOGISTICS PROVIDER</p>
                     </div>
-                    <code className="bg-emerald-50 text-emerald-800 px-3 py-2 text-xs font-mono font-bold border border-emerald-400">
+                    <code className="bg-emerald-50 text-emerald-800 px-3 py-2 text-xs font-mono font-bold border border-emerald-400 break-all">
                       vendor2@transport.com
                     </code>
                   </div>
