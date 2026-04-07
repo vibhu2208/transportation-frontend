@@ -8,9 +8,11 @@ import { AccountsUpdateModal } from './AccountsUpdateModal';
 import { GRDetailsModal } from './GRDetailsModal';
 import { goodsReceiptApi } from '@/lib/api-client';
 import { GoodsReceipt } from '@/types/goods-receipt';
+import toast from 'react-hot-toast';
 
 interface AdminTripData {
   id: string;
+  vendorId?: string;
   tripNo: string;
   date: string;
   vendorName: string;
@@ -27,6 +29,17 @@ interface AdminTripData {
   profitLoss?: number;
   billNo?: string;
   billDate?: string;
+  driverName?: string;
+  driverPhone?: string;
+  startLocation?: string;
+  endLocation?: string;
+  startTime?: string;
+  endTime?: string;
+  distance?: number;
+  fare?: number;
+  expense?: number;
+  party?: string;
+  notes?: string;
   status: string;
   createdAt: string;
   remarks?: string;
@@ -47,6 +60,7 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
   const [showGRModal, setShowGRModal] = useState<AdminTripData | null>(null);
   const [showOperationsModal, setShowOperationsModal] = useState<AdminTripData | null>(null);
   const [showAccountsModal, setShowAccountsModal] = useState<AdminTripData | null>(null);
+  const [savingField, setSavingField] = useState<string | null>(null);
   
   // Filter states
   const [filters, setFilters] = useState({
@@ -174,6 +188,54 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
     return profitLoss >= 0 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold';
   };
 
+  const isMarketParty = (partyName?: string) =>
+    (partyName || '').trim().toLowerCase().includes('market');
+
+  const needsAdvanceAlert = (trip: AdminTripData) =>
+    isMarketParty(trip.partyName) && (trip.advance === null || trip.advance === undefined);
+
+  const needsPaymentPendingAlert = (trip: AdminTripData) =>
+    isMarketParty(trip.partyName) &&
+    (trip.freight ?? 0) > 0 &&
+    (trip.advance ?? 0) < (trip.freight ?? 0);
+
+  const parseNumberInput = (value: string): number | null => {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const parsed = Number(trimmed);
+    return Number.isNaN(parsed) ? null : parsed;
+  };
+
+  const updateLocalTripField = (field: keyof AdminTripData, value: any) => {
+    setShowTripModal((prev) => (prev ? { ...prev, [field]: value } : prev));
+  };
+
+  const saveTripInlineField = async (
+    trip: AdminTripData,
+    field: keyof AdminTripData,
+    value: string | number | null | undefined,
+  ) => {
+    const key = `${trip.id}:${String(field)}`;
+    setSavingField(key);
+    try {
+      let endpoint = `/trips/${trip.id}`;
+      let payload: Record<string, unknown> = { [field]: value };
+
+      if (field === 'freight' || field === 'billNo' || field === 'billDate') {
+        endpoint = `/trips/${trip.id}/accounts`;
+      } else if (field === 'grLrNo' || field === 'tollExpense') {
+        endpoint = `/trips/${trip.id}/operations`;
+      }
+
+      await api.patch(endpoint, payload);
+      await onRefresh();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Auto-save failed');
+    } finally {
+      setSavingField(null);
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
       <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
@@ -277,6 +339,11 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                   <span className="text-gray-400">|</span>
                   <span className="truncate max-w-[12rem]">{trip.vendorName}</span>
                 </div>
+                {(needsAdvanceAlert(trip) || needsPaymentPendingAlert(trip)) && (
+                  <p className="mt-2 inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                    {needsAdvanceAlert(trip) ? 'Advance pending (Market)' : 'Payment pending'}
+                  </p>
+                )}
               </button>
             ))}
           </div>
@@ -311,7 +378,14 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                       {trip.vendorName}
                     </td>
                     <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-sm text-gray-900">
-                      {trip.partyName}
+                      <div className="flex items-center gap-2">
+                        <span>{trip.partyName}</span>
+                        {(needsAdvanceAlert(trip) || needsPaymentPendingAlert(trip)) && (
+                          <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">
+                            {needsAdvanceAlert(trip) ? 'Advance pending' : 'Payment pending'}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-sm text-gray-900">
                       {trip.fromLocation}
@@ -398,7 +472,21 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                     </div>
                     <div>
                       <span className="text-sm font-medium text-gray-500">GR/LR No:</span>
-                      <p className="text-sm text-gray-900">{showTripModal.grLrNo || '-'}</p>
+                      <input
+                        type="text"
+                        defaultValue={showTripModal.grLrNo || ''}
+                        onBlur={(e) => {
+                          const nextValue = e.target.value.trim() || null;
+                          if ((showTripModal.grLrNo || null) === nextValue) return;
+                          updateLocalTripField('grLrNo', nextValue || undefined);
+                          saveTripInlineField(showTripModal, 'grLrNo', nextValue);
+                        }}
+                        className="mt-1 w-full px-2 py-1 border border-gray-300 rounded-sm text-sm"
+                        placeholder="Enter GR/LR No"
+                      />
+                      {savingField === `${showTripModal.id}:grLrNo` && (
+                        <p className="text-xs text-blue-600 mt-1">Saving...</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -409,23 +497,103 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     <div>
                       <span className="text-sm font-medium text-gray-500">Freight:</span>
-                      <p className="text-sm text-gray-900">{formatCurrency(showTripModal.freight)}</p>
+                      <input
+                        type="number"
+                        step="0.01"
+                        defaultValue={showTripModal.freight ?? ''}
+                        onBlur={(e) => {
+                          const nextValue = parseNumberInput(e.target.value);
+                          const currentValue = showTripModal.freight ?? null;
+                          if (currentValue === nextValue) return;
+                          updateLocalTripField('freight', nextValue ?? undefined);
+                          saveTripInlineField(showTripModal, 'freight', nextValue);
+                        }}
+                        className="mt-1 w-full px-2 py-1 border border-gray-300 rounded-sm text-sm"
+                        placeholder="0.00"
+                      />
+                      {savingField === `${showTripModal.id}:freight` && (
+                        <p className="text-xs text-blue-600 mt-1">Saving...</p>
+                      )}
                     </div>
                     <div>
                       <span className="text-sm font-medium text-gray-500">Advance:</span>
-                      <p className="text-sm text-gray-900">{formatCurrency(showTripModal.advance)}</p>
+                      <input
+                        type="number"
+                        step="0.01"
+                        defaultValue={showTripModal.advance ?? ''}
+                        onBlur={(e) => {
+                          const nextValue = parseNumberInput(e.target.value);
+                          const currentValue = showTripModal.advance ?? null;
+                          if (currentValue === nextValue) return;
+                          updateLocalTripField('advance', nextValue ?? undefined);
+                          saveTripInlineField(showTripModal, 'advance', nextValue);
+                        }}
+                        className={`mt-1 w-full px-2 py-1 border rounded-sm text-sm ${(needsAdvanceAlert(showTripModal) || needsPaymentPendingAlert(showTripModal)) ? 'border-red-400 text-red-700' : 'border-gray-300'}`}
+                        placeholder="0.00"
+                      />
+                      {savingField === `${showTripModal.id}:advance` && (
+                        <p className="text-xs text-blue-600 mt-1">Saving...</p>
+                      )}
                     </div>
                     <div>
                       <span className="text-sm font-medium text-gray-500">Toll:</span>
-                      <p className="text-sm text-gray-900">{formatCurrency(showTripModal.tollExpense)}</p>
+                      <input
+                        type="number"
+                        step="0.01"
+                        defaultValue={showTripModal.tollExpense ?? ''}
+                        onBlur={(e) => {
+                          const nextValue = parseNumberInput(e.target.value);
+                          const currentValue = showTripModal.tollExpense ?? null;
+                          if (currentValue === nextValue) return;
+                          updateLocalTripField('tollExpense', nextValue ?? undefined);
+                          saveTripInlineField(showTripModal, 'tollExpense', nextValue);
+                        }}
+                        className="mt-1 w-full px-2 py-1 border border-gray-300 rounded-sm text-sm"
+                        placeholder="0.00"
+                      />
+                      {savingField === `${showTripModal.id}:tollExpense` && (
+                        <p className="text-xs text-blue-600 mt-1">Saving...</p>
+                      )}
                     </div>
                     <div>
                       <span className="text-sm font-medium text-gray-500">Initial:</span>
-                      <p className="text-sm text-gray-900">{formatCurrency(showTripModal.initialExpense)}</p>
+                      <input
+                        type="number"
+                        step="0.01"
+                        defaultValue={showTripModal.initialExpense ?? ''}
+                        onBlur={(e) => {
+                          const nextValue = parseNumberInput(e.target.value);
+                          const currentValue = showTripModal.initialExpense ?? null;
+                          if (currentValue === nextValue) return;
+                          updateLocalTripField('initialExpense', nextValue ?? undefined);
+                          saveTripInlineField(showTripModal, 'initialExpense', nextValue);
+                        }}
+                        className="mt-1 w-full px-2 py-1 border border-gray-300 rounded-sm text-sm"
+                        placeholder="0.00"
+                      />
+                      {savingField === `${showTripModal.id}:initialExpense` && (
+                        <p className="text-xs text-blue-600 mt-1">Saving...</p>
+                      )}
                     </div>
                     <div>
                       <span className="text-sm font-medium text-gray-500">Total Expense:</span>
-                      <p className="text-sm text-gray-900">{formatCurrency(showTripModal.totalExpense)}</p>
+                      <input
+                        type="number"
+                        step="0.01"
+                        defaultValue={showTripModal.totalExpense ?? ''}
+                        onBlur={(e) => {
+                          const nextValue = parseNumberInput(e.target.value);
+                          const currentValue = showTripModal.totalExpense ?? null;
+                          if (currentValue === nextValue) return;
+                          updateLocalTripField('totalExpense', nextValue ?? undefined);
+                          saveTripInlineField(showTripModal, 'totalExpense', nextValue);
+                        }}
+                        className="mt-1 w-full px-2 py-1 border border-gray-300 rounded-sm text-sm"
+                        placeholder="0.00"
+                      />
+                      {savingField === `${showTripModal.id}:totalExpense` && (
+                        <p className="text-xs text-blue-600 mt-1">Saving...</p>
+                      )}
                     </div>
                     <div>
                       <span className="text-sm font-medium text-gray-500">P&L:</span>
@@ -435,11 +603,39 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                     </div>
                     <div>
                       <span className="text-sm font-medium text-gray-500">Bill No:</span>
-                      <p className="text-sm text-gray-900">{showTripModal.billNo || '-'}</p>
+                      <input
+                        type="text"
+                        defaultValue={showTripModal.billNo || ''}
+                        onBlur={(e) => {
+                          const nextValue = e.target.value.trim() || null;
+                          if ((showTripModal.billNo || null) === nextValue) return;
+                          updateLocalTripField('billNo', nextValue || undefined);
+                          saveTripInlineField(showTripModal, 'billNo', nextValue);
+                        }}
+                        className="mt-1 w-full px-2 py-1 border border-gray-300 rounded-sm text-sm"
+                        placeholder="Enter bill number"
+                      />
+                      {savingField === `${showTripModal.id}:billNo` && (
+                        <p className="text-xs text-blue-600 mt-1">Saving...</p>
+                      )}
                     </div>
                     <div>
                       <span className="text-sm font-medium text-gray-500">Bill Date:</span>
-                      <p className="text-sm text-gray-900">{showTripModal.billDate || '-'}</p>
+                      <input
+                        type="date"
+                        defaultValue={(showTripModal.billDate || '').split('T')[0]}
+                        onBlur={(e) => {
+                          const nextValue = e.target.value || null;
+                          const currentDate = (showTripModal.billDate || '').split('T')[0] || null;
+                          if (currentDate === nextValue) return;
+                          updateLocalTripField('billDate', nextValue || undefined);
+                          saveTripInlineField(showTripModal, 'billDate', nextValue);
+                        }}
+                        className="mt-1 w-full px-2 py-1 border border-gray-300 rounded-sm text-sm"
+                      />
+                      {savingField === `${showTripModal.id}:billDate` && (
+                        <p className="text-xs text-blue-600 mt-1">Saving...</p>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -13,6 +13,16 @@ import { Party } from '@/modules/parties/types';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 
+const optionalNumber = z.preprocess((value) => {
+  if (value === '' || value === null || value === undefined) return undefined;
+  if (typeof value === 'number' && Number.isNaN(value)) return undefined;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? undefined : parsed;
+  }
+  return value;
+}, z.number().optional());
+
 function buildVendorSubmissionSchema(forAdmin: boolean) {
   return z
     .object({
@@ -22,8 +32,9 @@ function buildVendorSubmissionSchema(forAdmin: boolean) {
       fromLocation: z.string().min(1, 'From location is required'),
       toLocation: z.string().min(1, 'To location is required'),
       vehicleNumber: z.string().min(1, 'Vehicle number is required'),
-      initialExpense: z.number().optional(),
-      advance: z.number().optional(),
+      initialExpense: optionalNumber,
+      advance: optionalNumber,
+      freight: optionalNumber,
       remarks: z.string().optional(),
     })
     .superRefine((data, ctx) => {
@@ -126,6 +137,7 @@ export function VendorSubmissionForm({
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
     reset,
     control,
@@ -136,11 +148,16 @@ export function VendorSubmissionForm({
       vendorId: '',
     },
   });
+  const selectedPartyName = watch('partyName') || '';
+  const isMarketParty = selectedPartyName.trim().toLowerCase().includes('market');
 
   const onSubmit = async (data: VendorSubmissionData) => {
     setIsLoading(true);
     try {
       const payload: Record<string, unknown> = { ...data };
+      if (!isMarketParty) {
+        delete payload.advance;
+      }
       if (!forAdmin) {
         delete payload.vendorId;
       }
@@ -244,7 +261,10 @@ export function VendorSubmissionForm({
                 name="partyName"
                 control={control}
                 render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value}
+                  >
                     <SelectTrigger className={errors.partyName ? 'border-destructive' : ''}>
                       <SelectValue placeholder="Select a party" />
                     </SelectTrigger>
@@ -331,16 +351,31 @@ export function VendorSubmissionForm({
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
-              Advance
+              Freight
             </label>
             <Input
               type="number"
               step="0.01"
-              {...register('advance', { valueAsNumber: true })}
-              error={errors.advance?.message}
+              {...register('freight', { valueAsNumber: true })}
+              error={errors.freight?.message}
               placeholder="0.00"
             />
           </div>
+
+          {isMarketParty && (
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Advance (Market Party Only)
+              </label>
+              <Input
+                type="number"
+                step="0.01"
+                {...register('advance', { valueAsNumber: true })}
+                error={errors.advance?.message}
+                placeholder="0.00"
+              />
+            </div>
+          )}
 
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-foreground mb-2">
