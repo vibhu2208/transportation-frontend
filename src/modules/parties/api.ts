@@ -1,5 +1,5 @@
 import { api } from '@/lib/api';
-import { CreatePartyRequest, UpdatePartyRequest, Party } from './types';
+import { CreatePartyRequest, UpdatePartyRequest, Party, PartyDetailResponse } from './types';
 
 export const partiesApi = {
   async getParties(): Promise<Party[]> {
@@ -11,6 +11,11 @@ export const partiesApi = {
 
   async getParty(id: string): Promise<Party> {
     const response = await api.get(`/parties/${id}`);
+    return response.data;
+  },
+
+  async getPartyDetail(id: string): Promise<PartyDetailResponse> {
+    const response = await api.get(`/parties/${id}/detail`);
     return response.data;
   },
 

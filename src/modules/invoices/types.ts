@@ -64,6 +64,7 @@ export interface Invoice {
   invoiceNo: string;
   invoiceDate: string;
   partyName: string;
+  partyId?: string | null;
   partyGstIn?: string;
   partyAddress?: string;
   subTotal: number;
@@ -74,6 +75,9 @@ export interface Invoice {
   notes?: string;
   trips: Trip[];
   moneyReceipts?: MoneyReceipt[];
+  /** Present on list responses when using allocation-based receipts */
+  paidTotal?: number;
+  remaining?: number;
   createdAt: string;
   updatedAt: string;
 }

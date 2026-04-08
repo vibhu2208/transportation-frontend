@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -13,6 +14,7 @@ import { partiesApi } from './api';
 import { Party, CreatePartyRequest } from './types';
 
 export default function PartyManagement() {
+  const router = useRouter();
   const [parties, setParties] = useState<Party[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -83,13 +85,15 @@ export default function PartyManagement() {
     }
   };
 
-  const handleEdit = (party: Party) => {
+  const handleEdit = (e: React.MouseEvent, party: Party) => {
+    e.stopPropagation();
     setCurrentParty(party);
     setIsEditing(true);
     setShowForm(true);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
     if (!confirm('Are you sure you want to delete this party?')) return;
     try {
       setLoading(true);
@@ -206,14 +210,26 @@ export default function PartyManagement() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {parties.map((party) => (
-          <Card key={party.id}>
+          <Card
+            key={party.id}
+            className="cursor-pointer transition-shadow hover:shadow-md"
+            role="button"
+            tabIndex={0}
+            onClick={() => router.push(`/admin/dashboard/parties/${party.id}`)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                router.push(`/admin/dashboard/parties/${party.id}`);
+              }
+            }}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-lg font-bold">{party.name}</CardTitle>
-              <div className="flex gap-1">
-                <Button variant="ghost" size="sm" onClick={() => handleEdit(party)}>
+              <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                <Button variant="ghost" size="sm" onClick={(e) => handleEdit(e, party)}>
                   <Edit2 className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => handleDelete(party.id)} className="text-red-500">
+                <Button variant="ghost" size="sm" onClick={(e) => handleDelete(e, party.id)} className="text-red-500">
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>

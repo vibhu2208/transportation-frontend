@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense, useCallback } from 'react';
 import { api } from '@/lib/api';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { UserRole } from '@/types/auth';
 import { AdminTripTable } from '@/components/trips/AdminTripTable';
@@ -10,30 +11,61 @@ import WhatsAppTestDashboard from '@/components/whatsapp/WhatsAppTestDashboard';
 import { ExportButton } from '@/components/admin/ExportButton';
 import { VehicleDashboard } from '@/modules/analytics/VehicleDashboard';
 import InvoiceManagement from '@/modules/invoices/InvoiceManagement';
+import MoneyReceiptPage from '@/modules/money-receipt/MoneyReceiptPage';
 import PartyManagement from '@/modules/parties/PartyManagement';
 import { AdminDashboardOverview } from '@/components/admin/AdminDashboardOverview';
 import { Button } from '@/components/ui/Button';
 import { VendorSubmissionForm } from '@/components/trips/VendorSubmissionForm';
+import { BulkTripUploadPanel } from '@/components/trips/BulkTripUploadPanel';
 import {
   AdminSettingsPanel,
   type SettingsSubTab,
 } from '@/components/admin/AdminSettingsPanel';
 
-export default function AdminDashboard() {
+const DASHBOARD_TAB_KEYS = new Set([
+  'overview',
+  'manage',
+  'invoices',
+  'moneyReceipt',
+  'parties',
+  'vehicles',
+  'whatsapp',
+  'settings',
+]);
+
+type DashboardTab =
+  | 'overview'
+  | 'manage'
+  | 'invoices'
+  | 'moneyReceipt'
+  | 'parties'
+  | 'vehicles'
+  | 'whatsapp'
+  | 'settings';
+
+function AdminDashboardInner() {
   const [adminTrips, setAdminTrips] = useState([]);
-  const [activeTab, setActiveTab] = useState<
-    | 'overview'
-    | 'manage'
-    | 'invoices'
-    | 'parties'
-    | 'vehicles'
-    | 'whatsapp'
-    | 'settings'
-  >('overview');
+  const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   const [settingsSubTab, setSettingsSubTab] = useState<SettingsSubTab>('vendors');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showCreateTrip, setShowCreateTrip] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const selectTab = useCallback(
+    (tab: DashboardTab) => {
+      setActiveTab(tab);
+      router.replace(`/admin/dashboard?tab=${tab}`, { scroll: false });
+    },
+    [router],
+  );
+
+  useEffect(() => {
+    const t = searchParams.get('tab');
+    if (t && DASHBOARD_TAB_KEYS.has(t)) {
+      setActiveTab(t as DashboardTab);
+    }
+  }, [searchParams]);
 
   const handleLogout = () => {
     localStorage.removeItem('auth_token');
@@ -99,6 +131,7 @@ export default function AdminDashboard() {
                   'overview',
                   'manage',
                   'invoices',
+                  'moneyReceipt',
                   'parties',
                   'settings',
                   'vehicles',
@@ -107,7 +140,7 @@ export default function AdminDashboard() {
               ).map((tab) => (
                 <button
                   key={tab}
-                  onClick={() => setActiveTab(tab)}
+                  onClick={() => selectTab(tab)}
                   className={`shrink-0 py-2.5 px-3 text-sm font-medium rounded-lg transition-all duration-200 ${
                     activeTab === tab
                       ? 'bg-emerald-600 text-white shadow-md'
@@ -116,11 +149,13 @@ export default function AdminDashboard() {
                 >
                   {tab === 'invoices'
                     ? 'Invoice Mgmt'
-                    : tab === 'parties'
-                      ? 'Parties'
-                      : tab === 'settings'
-                        ? 'Settings'
-                        : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    : tab === 'moneyReceipt'
+                      ? 'Money receipt'
+                      : tab === 'parties'
+                        ? 'Parties'
+                        : tab === 'settings'
+                          ? 'Settings'
+                          : tab.charAt(0).toUpperCase() + tab.slice(1)}
                 </button>
               ))}
             </nav>
@@ -144,12 +179,12 @@ export default function AdminDashboard() {
           {activeTab === 'overview' && (
             <AdminDashboardOverview
               refreshTrigger={refreshTrigger}
-              onOpenTrips={() => setActiveTab('manage')}
+              onOpenTrips={() => selectTab('manage')}
               onOpenVendors={() => {
                 setSettingsSubTab('vendors');
-                setActiveTab('settings');
+                selectTab('settings');
               }}
-              onOpenParties={() => setActiveTab('parties')}
+              onOpenParties={() => selectTab('parties')}
             />
           )}
 
@@ -203,6 +238,8 @@ export default function AdminDashboard() {
                 </div>
               )}
 
+              <BulkTripUploadPanel onTripsCreated={() => setRefreshTrigger((prev) => prev + 1)} />
+
               <AdminTripTable trips={adminTrips} onRefresh={() => setRefreshTrigger((prev) => prev + 1)} />
             </div>
           )}
@@ -215,6 +252,12 @@ export default function AdminDashboard() {
             <InvoiceManagement />
           )}
 
+          {activeTab === 'moneyReceipt' && (
+            <Suspense fallback={<div className="py-10 text-center text-slate-600">Loading…</div>}>
+              <MoneyReceiptPage />
+            </Suspense>
+          )}
+
           {activeTab === 'parties' && (
             <PartyManagement />
           )}
@@ -225,5 +268,19 @@ export default function AdminDashboard() {
         </div>
       </div>
     </ProtectedRoute>
+  );
+}
+
+export default function AdminDashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-slate-50/80">
+          <Loader2 className="h-10 w-10 animate-spin text-emerald-600" />
+        </div>
+      }
+    >
+      <AdminDashboardInner />
+    </Suspense>
   );
 }
