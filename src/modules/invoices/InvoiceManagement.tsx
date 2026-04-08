@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import Link from 'next/link';
 import {
   Truck,
   Calendar,
@@ -625,6 +626,14 @@ export default function InvoiceManagement() {
                         </p>
                       </div>
                       <div className="flex shrink-0 flex-wrap gap-2 lg:flex-col lg:items-stretch">
+                        {invoice.partyId && (
+                          <Link
+                            href={`/admin/dashboard/money-receipts?partyId=${encodeURIComponent(invoice.partyId)}`}
+                            className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-white px-3 text-sm font-medium text-emerald-800 shadow-sm hover:bg-emerald-50"
+                          >
+                            GR settlement
+                          </Link>
+                        )}
                         <Button
                           type="button"
                           variant="outline"

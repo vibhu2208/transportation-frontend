@@ -3,15 +3,16 @@ import axios from 'axios';
 const ENVIRONMENT = process.env.NEXT_PUBLIC_ENV || 'development';
 
 /**
- * In the browser during `next dev`, default to same-origin `/api-backend` so Next.js rewrites
- * forward to Nest (port 3000). That avoids "Cannot POST /invoices/..." when requests accidentally
- * hit the Next server on the same port as NEXT_PUBLIC_API_URL.
+ * In the browser, default to same-origin `/api-backend` so Next.js rewrites forward to Nest
+ * (see next.config.js). Only using `NEXT_PUBLIC_API_URL` in production (`next start`) skipped the
+ * proxy and could send POSTs to the Next origin — e.g. "Cannot POST /trips/bulk-upload/preview".
+ *
+ * Set `NEXT_PUBLIC_API_USE_PROXY=false` and `NEXT_PUBLIC_API_URL` to call the API directly.
  */
 function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const proxyDisabled = process.env.NEXT_PUBLIC_API_USE_PROXY === 'false';
-    const isDev = process.env.NODE_ENV === 'development';
-    if (isDev && !proxyDisabled) {
+    if (!proxyDisabled) {
       return `${window.location.origin}/api-backend`;
     }
   }

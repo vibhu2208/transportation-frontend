@@ -20,8 +20,15 @@ export const invoicesApi = {
     return response.data;
   },
 
-  async getInvoices(): Promise<Invoice[]> {
-    const response = await api.get('/invoices');
+  async getInvoices(params?: { partyId?: string; pendingOnly?: boolean }): Promise<Invoice[]> {
+    const response = await api.get('/invoices', {
+      params: params
+        ? {
+            ...(params.partyId ? { partyId: params.partyId } : {}),
+            ...(params.pendingOnly ? { pendingOnly: 'true' } : {}),
+          }
+        : undefined,
+    });
     return response.data;
   },
 
