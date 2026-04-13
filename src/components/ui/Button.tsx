@@ -11,12 +11,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     const baseClasses = 'inline-flex items-center justify-center rounded-md font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50';
     
     const variantClasses = {
-      primary: 'bg-primary text-primary-foreground hover:bg-primary/90',
-      secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-      outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
-      ghost: 'hover:bg-accent hover:text-accent-foreground',
-      destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
-      danger: 'bg-red-600 text-white hover:bg-red-700',
+      primary: 'bg-primary text-primary-foreground hover:bg-primary-700 shadow-sm',
+      secondary: 'bg-white text-foreground border border-border hover:bg-secondary shadow-sm',
+      outline: 'border border-primary text-primary bg-white hover:bg-primary-50 shadow-sm',
+      ghost: 'text-foreground hover:bg-secondary',
+      destructive: 'bg-destructive text-destructive-foreground hover:bg-red-600 shadow-sm',
+      danger: 'bg-destructive text-destructive-foreground hover:bg-red-600 shadow-sm',
     };
 
     const sizeClasses = {

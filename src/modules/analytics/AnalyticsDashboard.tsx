@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { BarChart3, TrendingUp, Users, DollarSign, Truck, AlertCircle } from 'lucide-react';
-import axios from 'axios';
 import toast from 'react-hot-toast';
+import { api } from '@/lib/api';
+import { UserRole } from '@/types/auth';
+import { StatCard } from '@/components/dashboard/StatCard';
 
 interface DashboardStats {
   totalTrips: number;
@@ -26,11 +28,31 @@ export function AnalyticsDashboard() {
 
   const fetchDashboardStats = async () => {
     try {
-      const token = localStorage.getItem('auth_token');
-      const headers = { Authorization: `Bearer ${token}` };
-      
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/analytics/dashboard`, { headers });
-      setStats(response.data);
+      const userRaw = localStorage.getItem('user_data');
+      const role = userRaw ? JSON.parse(userRaw).role : null;
+
+      if (role === UserRole.ADMIN) {
+        const { data } = await api.get('/admin/dashboard-stats');
+        setStats({
+          totalTrips: data.totalTrips ?? 0,
+          completedTrips: data.completedTrips ?? 0,
+          pendingTrips: data.pendingTrips ?? 0,
+          totalVendors: data.totalVendors ?? 0,
+          activeVendors: data.activeVendors ?? data.totalVendors ?? 0,
+          totalRevenue: data.totalRevenue ?? 0,
+          totalDistance: 0,
+          completionRate:
+            data.totalTrips > 0
+              ? ((data.completedTrips ?? 0) / data.totalTrips) * 100
+              : 0,
+        });
+      } else {
+        const { data } = await api.get('/analytics/dashboard');
+        setStats({
+          ...data,
+          completionRate: data.completionRate ?? 0,
+        });
+      }
     } catch (error: any) {
       toast.error('Failed to fetch analytics data');
       console.error(error);
@@ -39,12 +61,65 @@ export function AnalyticsDashboard() {
     }
   };
 
+  const statCards = useMemo(() => {
+    if (!stats) return [];
+    return [
+      {
+        title: 'Total Trips',
+        value: String(stats.totalTrips),
+        icon: Truck,
+        tone: 'default' as const,
+      },
+      {
+        title: 'Completed Trips',
+        value: String(stats.completedTrips),
+        icon: BarChart3,
+        tone: 'success' as const,
+      },
+      {
+        title: 'Pending Trips',
+        value: String(stats.pendingTrips),
+        icon: AlertCircle,
+        tone: 'warning' as const,
+      },
+      {
+        title: 'Total Vendors',
+        value: String(stats.totalVendors),
+        icon: Users,
+        tone: 'default' as const,
+      },
+      {
+        title: 'Active Vendors',
+        value: String(stats.activeVendors),
+        icon: TrendingUp,
+        tone: 'default' as const,
+      },
+      {
+        title: 'Total Revenue',
+        value: `₹${stats.totalRevenue.toLocaleString('en-IN')}`,
+        icon: DollarSign,
+        tone: 'success' as const,
+        subtitle: 'From trip fare aggregate',
+      },
+    ];
+  }, [stats]);
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading analytics...</p>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold text-gray-900">Analytics Dashboard</h1>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <StatCard
+              key={i}
+              title="—"
+              value="—"
+              icon={Truck}
+              loading
+            />
+          ))}
         </div>
       </div>
     );
@@ -58,106 +133,53 @@ export function AnalyticsDashboard() {
     );
   }
 
-  const statCards = [
-    {
-      title: 'Total Trips',
-      value: stats.totalTrips,
-      icon: Truck,
-      color: 'text-blue-600 bg-blue-50',
-      change: '+12%',
-    },
-    {
-      title: 'Completed Trips',
-      value: stats.completedTrips,
-      icon: BarChart3,
-      color: 'text-green-600 bg-green-50',
-      change: '+8%',
-    },
-    {
-      title: 'Pending Trips',
-      value: stats.pendingTrips,
-      icon: AlertCircle,
-      color: 'text-yellow-600 bg-yellow-50',
-      change: '-3%',
-    },
-    {
-      title: 'Total Vendors',
-      value: stats.totalVendors,
-      icon: Users,
-      color: 'text-purple-600 bg-purple-50',
-      change: '+5%',
-    },
-    {
-      title: 'Active Vendors',
-      value: stats.activeVendors,
-      icon: TrendingUp,
-      color: 'text-indigo-600 bg-indigo-50',
-      change: '+2%',
-    },
-    {
-      title: 'Total Revenue',
-      value: `$${stats.totalRevenue.toLocaleString()}`,
-      icon: DollarSign,
-      color: 'text-green-600 bg-green-50',
-      change: '+15%',
-    },
-  ];
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-900">Analytics Dashboard</h1>
         <button
+          type="button"
           onClick={fetchDashboardStats}
-          className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
+          className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-md transition hover:opacity-90"
         >
           Refresh
         </button>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {statCards.map((stat, index) => {
           const Icon = stat.icon;
           return (
-            <div key={index} className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center">
-                <div className={`p-3 rounded-full ${stat.color}`}>
-                  <Icon className="h-6 w-6" />
-                </div>
-                <div className="ml-4 flex-1">
-                  <p className="text-sm font-medium text-gray-600">{stat.title}</p>
-                  <p className="text-2xl font-semibold text-gray-900">{stat.value}</p>
-                </div>
-              </div>
-              <div className="mt-4 flex items-center text-sm">
-                <span className="text-green-600 font-medium">{stat.change}</span>
-                <span className="text-gray-500 ml-2">from last month</span>
-              </div>
-            </div>
+            <StatCard
+              key={index}
+              title={stat.title}
+              value={stat.value}
+              subtitle={'subtitle' in stat ? stat.subtitle : undefined}
+              icon={Icon}
+              tone={stat.tone}
+            />
           );
         })}
       </div>
 
-      {/* Additional Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Performance Metrics</h3>
+        <div className="rounded-xl border border-slate-200/80 bg-white p-6 shadow-md">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Performance metrics</h3>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-gray-600">Completion Rate</span>
+              <span className="text-gray-600">Completion rate</span>
               <span className="text-lg font-semibold text-gray-900">
                 {stats.completionRate.toFixed(1)}%
               </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-green-600 h-2 rounded-full"
-                style={{ width: `${stats.completionRate}%` }}
-              ></div>
+            <div className="h-2 w-full rounded-full bg-gray-200">
+              <div
+                className="h-2 rounded-full bg-emerald-600 transition-all duration-500"
+                style={{ width: `${Math.min(100, stats.completionRate)}%` }}
+              />
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-gray-600">Total Distance</span>
+              <span className="text-gray-600">Total distance</span>
               <span className="text-lg font-semibold text-gray-900">
                 {stats.totalDistance.toLocaleString()} km
               </span>
@@ -165,19 +187,12 @@ export function AnalyticsDashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
-          <div className="space-y-3">
-            <button className="w-full px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors">
-              Generate Monthly Report
-            </button>
-            <button className="w-full px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors">
-              Export Trip Data
-            </button>
-            <button className="w-full px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors">
-              Vendor Performance Analysis
-            </button>
-          </div>
+        <div className="rounded-xl border border-slate-200/80 bg-white p-6 shadow-md">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Note</h3>
+          <p className="text-sm text-gray-600 leading-relaxed">
+            Admins see counts from the admin dashboard service. For detailed financial KPIs, charts,
+            and receivables, open the <strong>Overview</strong> tab on the admin dashboard.
+          </p>
         </div>
       </div>
     </div>

@@ -29,18 +29,18 @@ export function TripManagement() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900">Trip Management</h1>
-        <div className="flex items-center space-x-3">
-          <Button onClick={handleCreateTrip}>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <h1 className="text-xl sm:text-2xl font-semibold text-foreground">Trip Management</h1>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+          <Button onClick={handleCreateTrip} className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
             New Trip
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" className="w-full sm:w-auto">
             <Upload className="mr-2 h-4 w-4" />
             Bulk Sync
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" className="w-full sm:w-auto">
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
@@ -48,9 +48,9 @@ export function TripManagement() {
       </div>
 
       {/* Search and Filters */}
-      <div className="flex items-center space-x-4 bg-white p-4 rounded-lg shadow">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:space-x-4 bg-white p-4 rounded-lg shadow-sm border border-border">
+        <div className="flex-1 relative min-w-0">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search trips by vehicle number, driver, or location..."
             value={searchTerm}
@@ -58,7 +58,7 @@ export function TripManagement() {
             className="pl-10"
           />
         </div>
-        <Button variant="outline">
+        <Button variant="outline" className="w-full sm:w-auto shrink-0">
           <Filter className="mr-2 h-4 w-4" />
           Filters
         </Button>
@@ -66,18 +66,18 @@ export function TripManagement() {
 
       {/* Trip Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4">
-            <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between p-6 border-b">
-                <h2 className="text-xl font-semibold">
+        <div className="fixed inset-0 z-50 overflow-y-auto px-safe pt-safe pb-safe">
+          <div className="flex min-h-full items-center justify-center p-2 sm:p-4">
+            <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90dvh] sm:max-h-[90vh] overflow-y-auto mx-auto">
+              <div className="flex items-center justify-between p-4 sm:p-6 border-b">
+                <h2 className="text-lg sm:text-xl font-semibold pr-2">
                   {selectedTrip ? 'Edit Trip' : 'Create New Trip'}
                 </h2>
                 <Button variant="ghost" onClick={handleCloseForm}>
                   ×
                 </Button>
               </div>
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 <TripForm
                   trip={selectedTrip}
                   onSave={handleCloseForm}

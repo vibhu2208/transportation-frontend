@@ -31,70 +31,97 @@ export function VendorTripTable({ trips }: VendorTripTableProps) {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="text-lg font-medium text-gray-900">My Trips</h3>
-        <p className="mt-1 text-sm text-gray-500">Your submitted trips and their current status</p>
+    <div className="bg-white rounded-lg shadow-sm border border-border overflow-hidden">
+      <div className="px-4 sm:px-6 py-4 border-b border-border">
+        <h3 className="text-base sm:text-lg font-medium text-foreground">My Trips</h3>
+        <p className="mt-1 text-sm text-muted-foreground">Your submitted trips and their current status</p>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Trip No
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Date
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Party
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Route
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Vehicle
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Expense
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+      {trips.length > 0 && (
+        <>
+          <div className="md:hidden px-4 py-4 space-y-3 border-t border-border">
             {trips.map((trip) => (
-              <tr key={trip.tripNo} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">{trip.tripNo}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{trip.date}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{trip.partyName}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{trip.route}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">{trip.vehicleNumber}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{formatCurrency(trip.initialExpense)}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(trip.status)}`}>
+              <div
+                key={trip.tripNo}
+                className="rounded-lg border border-border p-4 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-sm font-semibold text-foreground">{trip.tripNo}</span>
+                  <span className={`shrink-0 inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${getStatusColor(trip.status)}`}>
                     {trip.status}
                   </span>
-                </td>
-              </tr>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">{trip.date}</p>
+                <p className="text-sm text-foreground mt-2">{trip.partyName}</p>
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{trip.route}</p>
+                <div className="mt-2 flex flex-wrap justify-between gap-2 text-sm">
+                  <span className="font-medium">{trip.vehicleNumber}</span>
+                  <span className="text-muted-foreground">{formatCurrency(trip.initialExpense)}</span>
+                </div>
+              </div>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </div>
+
+          <div className="hidden md:block table-scroll-bleed border-t border-border">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-secondary sticky top-0 z-10 shadow-sm">
+                <tr>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Trip No
+                  </th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Party
+                  </th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Route
+                  </th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Vehicle
+                  </th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Expense
+                  </th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {trips.map((trip) => (
+                  <tr key={trip.tripNo} className="hover:bg-secondary">
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-foreground">{trip.tripNo}</div>
+                    </td>
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                      <div className="text-sm text-foreground">{trip.date}</div>
+                    </td>
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                      <div className="text-sm text-foreground">{trip.partyName}</div>
+                    </td>
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                      <div className="text-sm text-foreground">{trip.route}</div>
+                    </td>
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-foreground">{trip.vehicleNumber}</div>
+                    </td>
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                      <div className="text-sm text-foreground">{formatCurrency(trip.initialExpense)}</div>
+                    </td>
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(trip.status)}`}>
+                        {trip.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {trips.length === 0 && (
         <div className="text-center py-12">
@@ -103,7 +130,7 @@ export function VendorTripTable({ trips }: VendorTripTableProps) {
         </div>
       )}
 
-      <div className="px-6 py-4 border-t border-gray-200 bg-blue-50">
+      <div className="px-4 sm:px-6 py-4 border-t border-gray-200 bg-blue-50">
         <div className="flex items-start">
           <div className="flex-shrink-0">
             <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">

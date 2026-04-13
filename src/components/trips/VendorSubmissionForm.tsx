@@ -1,26 +1,59 @@
 'use client';
 
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useState, useEffect } from 'react';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { VehicleAutocomplete } from '@/components/ui/VehicleAutocomplete';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { partiesApi } from '@/modules/parties/api';
+import { Party } from '@/modules/parties/types';
 import toast from 'react-hot-toast';
-import axios from 'axios';
+import { api } from '@/lib/api';
 
-const vendorSubmissionSchema = z.object({
-  date: z.string().min(1, 'Date is required'),
-  partyName: z.string().min(1, 'Party name is required'),
-  fromLocation: z.string().min(1, 'From location is required'),
-  toLocation: z.string().min(1, 'To location is required'),
-  vehicleNumber: z.string().min(1, 'Vehicle number is required'),
-  initialExpense: z.number().optional(),
-  advance: z.number().optional(),
-  remarks: z.string().optional(),
-});
+const optionalNumber = z.preprocess((value) => {
+  if (value === '' || value === null || value === undefined) return undefined;
+  if (typeof value === 'number' && Number.isNaN(value)) return undefined;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? undefined : parsed;
+  }
+  return value;
+}, z.number().optional());
 
-type VendorSubmissionData = z.infer<typeof vendorSubmissionSchema>;
+function buildVendorSubmissionSchema(forAdmin: boolean) {
+  return z
+    .object({
+      vendorId: z.string().optional(),
+      date: z.string().min(1, 'Date is required'),
+      partyName: z.string().min(1, 'Party name is required'),
+      fromLocation: z.string().min(1, 'From location is required'),
+      toLocation: z.string().min(1, 'To location is required'),
+      vehicleNumber: z.string().min(1, 'Vehicle number is required'),
+      initialExpense: optionalNumber,
+      advance: optionalNumber,
+      freight: optionalNumber,
+      remarks: z.string().optional(),
+    })
+    .superRefine((data, ctx) => {
+      if (forAdmin && !data.vendorId?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Vendor is required',
+          path: ['vendorId'],
+        });
+      }
+    });
+}
+
+type VendorSubmissionData = z.infer<ReturnType<typeof buildVendorSubmissionSchema>>;
+
+interface VendorOption {
+  id: string;
+  name: string;
+}
 
 interface VendorSubmissionResponse {
   success: boolean;
@@ -35,33 +68,103 @@ interface VendorSubmissionResponse {
 interface VendorSubmissionFormProps {
   onSave: (response?: VendorSubmissionResponse) => void;
   onCancel: () => void;
+  /** Admin: show vendor dropdown and send vendorId to the API. */
+  forAdmin?: boolean;
+  /** Use inside a modal: drop outer card max-width/padding wrapper. */
+  embedded?: boolean;
 }
 
-export function VendorSubmissionForm({ onSave, onCancel }: VendorSubmissionFormProps) {
+export function VendorSubmissionForm({
+  onSave,
+  onCancel,
+  forAdmin = false,
+  embedded = false,
+}: VendorSubmissionFormProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [parties, setParties] = useState<Party[]>([]);
+  const [vendors, setVendors] = useState<VendorOption[]>([]);
+  const [vendorsLoading, setVendorsLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchParties = async () => {
+      try {
+        console.log('VendorSubmissionForm: Fetching parties...');
+        let data = await partiesApi.getParties();
+        console.log('VendorSubmissionForm: Parties received:', data);
+        
+        if (data.length === 0) {
+          console.log('VendorSubmissionForm: No parties found, attempting sync...');
+          try {
+            await partiesApi.syncParties();
+            data = await partiesApi.getParties();
+            console.log('VendorSubmissionForm: Parties after sync:', data);
+          } catch (syncError) {
+            console.error('VendorSubmissionForm: Sync failed:', syncError);
+          }
+        }
+        
+        setParties(data);
+      } catch (error: any) {
+        console.error('VendorSubmissionForm: Error fetching parties:', error);
+        if (error.response) {
+          console.error('VendorSubmissionForm: Response data:', error.response.data);
+          console.error('VendorSubmissionForm: Response status:', error.response.status);
+        }
+      }
+    };
+    fetchParties();
+  }, []);
+
+  useEffect(() => {
+    if (!forAdmin) return;
+    const loadVendors = async () => {
+      setVendorsLoading(true);
+      try {
+        const token = localStorage.getItem('auth_token');
+        const res = await api.get<VendorOption[]>('/vendors', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setVendors(res.data ?? []);
+      } catch (e) {
+        console.error('VendorSubmissionForm: failed to load vendors', e);
+      } finally {
+        setVendorsLoading(false);
+      }
+    };
+    loadVendors();
+  }, [forAdmin]);
   
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
     reset,
+    control,
   } = useForm<VendorSubmissionData>({
-    resolver: zodResolver(vendorSubmissionSchema),
+    resolver: zodResolver(buildVendorSubmissionSchema(forAdmin)),
     defaultValues: {
-      date: new Date().toISOString().split('T')[0], // Default to today
+      date: new Date().toISOString().split('T')[0],
+      vendorId: '',
     },
   });
+  const selectedPartyName = watch('partyName') || '';
+  const isMarketParty = selectedPartyName.trim().toLowerCase().includes('market');
 
   const onSubmit = async (data: VendorSubmissionData) => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('auth_token');
-      const headers = { Authorization: `Bearer ${token}` };
+      const payload: Record<string, unknown> = { ...data };
+      if (!isMarketParty) {
+        delete payload.advance;
+      }
+      if (!forAdmin) {
+        delete payload.vendorId;
+      }
 
-      const response = await axios.post<VendorSubmissionResponse>(
-        `${process.env.NEXT_PUBLIC_API_URL}/trips/vendor-submission`,
-        data,
-        { headers }
+      const response = await api.post<VendorSubmissionResponse>(
+        '/trips/vendor-submission',
+        payload
       );
       
       const result = response.data;
@@ -75,23 +178,71 @@ export function VendorSubmissionForm({ onSave, onCancel }: VendorSubmissionFormP
       reset();
     } catch (error: any) {
       console.error('Vendor submission error:', error);
-      toast.error(error.response?.data?.message || 'Failed to submit trip');
+      const msg = error.response?.data?.message;
+      const detail = Array.isArray(msg) ? msg.join(', ') : msg;
+      toast.error(detail || 'Failed to submit trip');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const shellClass = embedded
+    ? ''
+    : 'max-w-4xl mx-auto p-4 sm:p-6 bg-white rounded-lg shadow-sm border border-border';
+
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-lg">
+    <div className={shellClass}>
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Submit Trip Booking</h2>
-        <p className="text-gray-600">Enter the basic trip details. Operations and billing information will be added later by the admin team.</p>
+        <h2 className="text-2xl font-bold text-foreground mb-2">Submit Trip Booking</h2>
+        <p className="text-muted-foreground">Enter the basic trip details. Operations and billing information will be added later by the admin team.</p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {forAdmin && (
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Vendor *
+              </label>
+              {vendors.length > 0 ? (
+                <Controller
+                  name="vendorId"
+                  control={control}
+                  render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger className={errors.vendorId ? 'border-destructive' : ''}>
+                        <SelectValue placeholder="Select a vendor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {vendors.map((v) => (
+                          <SelectItem key={v.id} value={v.id}>
+                            {v.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              ) : (
+                <Input
+                  {...register('vendorId')}
+                  error={errors.vendorId?.message}
+                  placeholder="Vendor ID"
+                />
+              )}
+              {errors.vendorId && (
+                <p className="mt-1 text-sm text-destructive">{errors.vendorId.message}</p>
+              )}
+              {vendors.length === 0 && !vendorsLoading && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  No vendors loaded. Enter vendor ID manually or check Settings → Vendors.
+                </p>
+              )}
+            </div>
+          )}
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Date *
             </label>
             <Input
@@ -102,18 +253,48 @@ export function VendorSubmissionForm({ onSave, onCancel }: VendorSubmissionFormP
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Party Name *
             </label>
-            <Input
-              {...register('partyName')}
-              error={errors.partyName?.message}
-              placeholder="Customer or party name"
-            />
+            {parties.length > 0 ? (
+              <Controller
+                name="partyName"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value}
+                  >
+                    <SelectTrigger className={errors.partyName ? 'border-destructive' : ''}>
+                      <SelectValue placeholder="Select a party" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {parties.map((party) => (
+                        <SelectItem key={party.id} value={party.name}>
+                          {party.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            ) : (
+              <Input
+                {...register('partyName')}
+                error={errors.partyName?.message}
+                placeholder="Type party name"
+              />
+            )}
+            {errors.partyName && (
+              <p className="mt-1 text-sm text-destructive">{errors.partyName.message}</p>
+            )}
+            {parties.length === 0 && !isLoading && (
+              <p className="mt-1 text-xs text-muted-foreground">No parties found. Please type the name manually.</p>
+            )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               From Location *
             </label>
             <Input
@@ -124,7 +305,7 @@ export function VendorSubmissionForm({ onSave, onCancel }: VendorSubmissionFormP
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               To Location *
             </label>
             <Input
@@ -135,18 +316,28 @@ export function VendorSubmissionForm({ onSave, onCancel }: VendorSubmissionFormP
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Vehicle Number *
             </label>
-            <Input
-              {...register('vehicleNumber')}
-              error={errors.vehicleNumber?.message}
-              placeholder="Vehicle registration number"
+            <Controller
+              name="vehicleNumber"
+              control={control}
+              render={({ field }) => (
+                <VehicleAutocomplete
+                  value={field.value}
+                  onChange={field.onChange}
+                  placeholder="Search vehicle number..."
+                  required
+                />
+              )}
             />
+            {errors.vehicleNumber && (
+              <p className="mt-1 text-sm text-red-600">{errors.vehicleNumber.message}</p>
+            )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Initial Expense
             </label>
             <Input
@@ -159,20 +350,35 @@ export function VendorSubmissionForm({ onSave, onCancel }: VendorSubmissionFormP
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Advance
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Freight
             </label>
             <Input
               type="number"
               step="0.01"
-              {...register('advance', { valueAsNumber: true })}
-              error={errors.advance?.message}
+              {...register('freight', { valueAsNumber: true })}
+              error={errors.freight?.message}
               placeholder="0.00"
             />
           </div>
 
+          {isMarketParty && (
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Advance (Market Party Only)
+              </label>
+              <Input
+                type="number"
+                step="0.01"
+                {...register('advance', { valueAsNumber: true })}
+                error={errors.advance?.message}
+                placeholder="0.00"
+              />
+            </div>
+          )}
+
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Remarks
             </label>
             <textarea

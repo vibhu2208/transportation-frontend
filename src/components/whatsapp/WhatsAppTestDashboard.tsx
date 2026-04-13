@@ -13,7 +13,7 @@ interface WhatsAppMessage {
   processed: boolean;
 }
 
-export function WhatsAppTestDashboard() {
+export default function WhatsAppTestDashboard() {
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
   const [isListening, setIsListening] = useState(false);
   const [testCredentials, setTestCredentials] = useState({
@@ -131,28 +131,29 @@ export function WhatsAppTestDashboard() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="bg-white rounded-lg shadow-lg">
+    <div className="max-w-7xl mx-auto p-4 sm:p-6">
+      <div className="bg-white rounded-lg shadow-lg overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900">WhatsApp Testing Dashboard</h2>
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
+          <div className="flex flex-col gap-4 lg:flex-row lg:justify-between lg:items-start">
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900">WhatsApp Testing Dashboard</h2>
               <p className="text-sm text-gray-500 mt-1">
                 Monitor and test WhatsApp webhook payloads
               </p>
             </div>
-            <div className="flex space-x-3">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-2 shrink-0">
               <Button
                 onClick={() => setIsListening(!isListening)}
                 variant={isListening ? "secondary" : "primary"}
+                className="w-full sm:w-auto"
               >
                 {isListening ? "⏸️ Stop Listening" : "🎧 Start Listening"}
               </Button>
-              <Button onClick={simulateIncomingMessage} variant="secondary">
+              <Button onClick={simulateIncomingMessage} variant="secondary" className="w-full sm:w-auto">
                 📨 Simulate Message
               </Button>
-              <Button onClick={clearMessagesAPI} variant="danger">
+              <Button onClick={clearMessagesAPI} variant="danger" className="w-full sm:w-auto">
                 🗑️ Clear All
               </Button>
             </div>
@@ -160,9 +161,9 @@ export function WhatsAppTestDashboard() {
         </div>
 
         {/* Test Credentials */}
-        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+        <div className="px-4 sm:px-6 py-4 bg-gray-50 border-b border-gray-200">
           <h3 className="text-sm font-medium text-gray-900 mb-2">Test Credentials</h3>
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm break-words">
             <div>
               <span className="font-medium text-gray-700">Phone Number ID:</span>
               <span className="ml-2 text-gray-600">{testCredentials.phoneNumberId}</span>
@@ -175,7 +176,7 @@ export function WhatsAppTestDashboard() {
         </div>
 
         {/* Status */}
-        <div className="px-6 py-4 bg-blue-50 border-b border-gray-200">
+        <div className="px-4 sm:px-6 py-4 bg-blue-50 border-b border-gray-200">
           <div className="flex items-center">
             <div className={`w-3 h-3 rounded-full mr-3 ${isListening ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
             <span className="text-sm font-medium text-gray-900">
@@ -185,7 +186,7 @@ export function WhatsAppTestDashboard() {
         </div>
 
         {/* Messages List */}
-        <div className="px-6 py-4">
+        <div className="px-4 sm:px-6 py-4">
           <h3 className="text-lg font-medium text-gray-900 mb-4">
             Received Messages ({messages.length})
           </h3>
@@ -201,16 +202,16 @@ export function WhatsAppTestDashboard() {
               {messages.map((message) => (
                 <div key={message.id} className="border border-gray-200 rounded-lg overflow-hidden">
                   {/* Message Header */}
-                  <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center space-x-4">
-                        <span className="text-sm font-medium text-gray-900">
+                  <div className="px-3 sm:px-4 py-3 bg-gray-50 border-b border-gray-200">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 min-w-0">
+                        <span className="text-sm font-medium text-gray-900 break-all">
                           From: {message.from}
                         </span>
-                        <span className="text-sm text-gray-500">
+                        <span className="text-sm text-gray-500 shrink-0">
                           {new Date(message.timestamp).toLocaleString()}
                         </span>
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        <span className={`inline-flex w-fit px-2 py-1 text-xs font-semibold rounded-full ${
                           message.processed 
                             ? 'bg-green-100 text-green-800' 
                             : 'bg-yellow-100 text-yellow-800'
@@ -218,12 +219,13 @@ export function WhatsAppTestDashboard() {
                           {message.processed ? 'Processed' : 'Pending'}
                         </span>
                       </div>
-                      <div className="flex space-x-2">
+                      <div className="flex shrink-0">
                         {!message.processed && (
                           <Button
                             onClick={() => markAsProcessedAPI(message.id)}
                             variant="secondary"
                             size="sm"
+                            className="w-full sm:w-auto"
                           >
                             Mark Processed
                           </Button>
