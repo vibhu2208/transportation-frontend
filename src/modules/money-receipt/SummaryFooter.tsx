@@ -33,12 +33,12 @@ export function SummaryFooter({
     <div className="rounded-xl border border-emerald-200 bg-emerald-50/95 p-4 shadow-md">
       <h3 className="border-b border-emerald-200/80 pb-2 text-sm font-semibold text-emerald-900">Summary</h3>
       <div className="mt-2" role="region" aria-label="Totals">
-        <Row label="Total invoice (loaded)" value={fmt(totalInvoiceAmount)} />
+        <Row label="Total pending (selected)" value={fmt(totalInvoiceAmount)} />
         <Row label="Total received" value={fmt(totalReceived)} />
         <Row label="Total TDS" value={fmt(totalTds)} />
-        <Row label="Total deduction" value={fmt(totalDeduction)} />
-        <Row label="Net to allocation" value={fmt(finalNet)} valueClassName="text-emerald-800" />
-        <Row label="Balance remaining (party)" value={fmt(balanceRemaining)} valueClassName="text-amber-800" />
+        <Row label="Total deduction (computed)" value={fmt(totalDeduction)} />
+        <Row label="Applied to invoices (R + TDS)" value={fmt(finalNet)} valueClassName="text-emerald-800" />
+        <Row label="Balance after this MR (selected)" value={fmt(balanceRemaining)} valueClassName="text-amber-800" />
       </div>
     </div>
   );

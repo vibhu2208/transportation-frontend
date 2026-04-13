@@ -310,7 +310,7 @@ export function AdminTripEditModal({
             <Input {...register('grLrNo')} placeholder="GR/LR No" />
             <Input type="number" step="0.01" {...register('tollExpense', { valueAsNumber: true })} placeholder="Toll Expense" />
             <Input type="number" step="0.01" {...register('freight', { valueAsNumber: true })} placeholder="Freight" />
-            <Input {...register('billNo')} placeholder="Bill No" />
+            <Input {...register('billNo')} placeholder="Party bill no." />
             <Input type="date" {...register('billDate')} />
             <Input type="number" step="0.01" {...register('totalExpense', { valueAsNumber: true })} placeholder="Total Expense" />
             <Input type="number" step="0.01" {...register('profitLoss', { valueAsNumber: true })} placeholder="Profit/Loss" />

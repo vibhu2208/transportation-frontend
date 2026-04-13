@@ -28,14 +28,11 @@ export interface InvoiceGrLinesResponse {
   lines: SettlementLine[];
 }
 
-export interface CreateMoneyReceiptLinePayload {
+/** One line per invoice on the MR */
+export interface MoneyReceiptInvoiceLinePayload {
   invoiceId: string;
-  tripId: string;
-  goodsReceiptId?: string | null;
-  freightAmount: number;
   receivedAmount: number;
   tdsAmount: number;
-  deduction: number;
 }
 
 export interface CreateMoneyReceiptPayload {
@@ -50,7 +47,30 @@ export interface CreateMoneyReceiptPayload {
   tdsRound: boolean;
   notes?: string;
   status?: string;
-  lines: CreateMoneyReceiptLinePayload[];
+  lines: MoneyReceiptInvoiceLinePayload[];
+}
+
+export interface InvoiceLookupResponse {
+  invoice: {
+    id: string;
+    invoiceNo: string;
+    invoiceDate: string;
+    partyId: string | null;
+    partyName: string;
+    grandTotal: number;
+    status: string;
+  };
+  lockPartyId: string | null;
+  lockPartyName: string;
+  paidTotal: number;
+  remaining: number;
+}
+
+export interface ReceiptMappingRow {
+  tripNo: string;
+  grNo: string;
+  invoiceNo: string;
+  receiptNo: string;
 }
 
 export interface Branch {

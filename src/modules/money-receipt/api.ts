@@ -4,6 +4,8 @@ import type {
   CreateMoneyReceiptPayload,
   Branch,
   Bank,
+  InvoiceLookupResponse,
+  ReceiptMappingRow,
 } from './types';
 
 export const moneyReceiptApi = {
@@ -44,6 +46,18 @@ export const moneyReceiptApi = {
 
   async getBanks(): Promise<Bank[]> {
     const response = await api.get('/banks');
+    return response.data;
+  },
+
+  async lookupInvoice(invoiceNo: string): Promise<InvoiceLookupResponse> {
+    const response = await api.get('/money-receipt/invoice-lookup', {
+      params: { invoiceNo },
+    });
+    return response.data;
+  },
+
+  async getPartyMapping(partyId: string): Promise<ReceiptMappingRow[]> {
+    const response = await api.get(`/money-receipt/party/${partyId}/mapping`);
     return response.data;
   },
 };

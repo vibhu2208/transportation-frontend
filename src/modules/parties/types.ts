@@ -34,6 +34,23 @@ export interface PartyDetailSummary {
   goodsReceiptCount: number;
 }
 
+export interface PartyBranch {
+  id: string;
+  partyId: string;
+  locationLabel: string | null;
+  fullLedgerName: string;
+  address: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatePartyBranchRequest {
+  fullLedgerName: string;
+  locationLabel?: string;
+  address?: string;
+}
+
 export interface PartyDetailInvoiceRow {
   id: string;
   invoiceNo: string;
@@ -43,6 +60,7 @@ export interface PartyDetailInvoiceRow {
   paidTotal: number;
   remaining: number;
   tripCount: number;
+  partyBranchId?: string | null;
 }
 
 export interface PartyDetailGrRow {
@@ -52,8 +70,9 @@ export interface PartyDetailGrRow {
   cnDate: string | null;
   fromStation: string | null;
   toStation: string | null;
-  freight: string | null;
-  totalFreight: string | null;
+  /** Trip freight (single source; no duplicate on GR). */
+  freight: number | null;
+  branchName: string | null;
   tripId: string;
   tripNo: string;
   invoiceNo: string | null;
@@ -91,11 +110,32 @@ export interface PartyDetailTripRow {
   advance: number | null;
   totalExpense: number | null;
   profitLoss: number | null;
+  partyBranchId?: string | null;
+  branchLedgerName?: string | null;
+  branchLocationLabel?: string | null;
+}
+
+export interface PartyDetailBranchBreakdown {
+  branch: {
+    id: string;
+    locationLabel: string | null;
+    fullLedgerName: string;
+    address: string | null;
+    isActive: boolean;
+  } | null;
+  tripCount: number;
+  remainingBalance: number;
+  trips: PartyDetailTripRow[];
+  invoices: PartyDetailInvoiceRow[];
+  unassigned?: boolean;
 }
 
 export interface PartyDetailResponse {
   party: Party;
   summary: PartyDetailSummary;
+  /** Present when API returns branch-aware party detail */
+  partyBranches?: PartyBranch[];
+  branchBreakdown?: PartyDetailBranchBreakdown[];
   trips: PartyDetailTripRow[];
   invoices: PartyDetailInvoiceRow[];
   goodsReceipts: PartyDetailGrRow[];

@@ -20,12 +20,17 @@ export const invoicesApi = {
     return response.data;
   },
 
-  async getInvoices(params?: { partyId?: string; pendingOnly?: boolean }): Promise<Invoice[]> {
+  async getInvoices(params?: {
+    partyId?: string;
+    pendingOnly?: boolean;
+    invoiceNo?: string;
+  }): Promise<Invoice[]> {
     const response = await api.get('/invoices', {
       params: params
         ? {
             ...(params.partyId ? { partyId: params.partyId } : {}),
             ...(params.pendingOnly ? { pendingOnly: 'true' } : {}),
+            ...(params.invoiceNo?.trim() ? { invoiceNo: params.invoiceNo.trim() } : {}),
           }
         : undefined,
     });
