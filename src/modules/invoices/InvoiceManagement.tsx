@@ -33,7 +33,7 @@ import {
   Invoice,
   InvoiceTemplate,
 } from './types';
-import { Party } from '../parties/types';
+import { Party, PartyBranch } from '../parties/types';
 
 export default function InvoiceManagement() {
   const [pendingTrips, setPendingTrips] = useState<PendingTripsByParty[]>([]);
@@ -64,6 +64,9 @@ export default function InvoiceManagement() {
   const [partyAddress, setPartyAddress] = useState('');
   const [gstRate, setGstRate] = useState('12');
   const [notes, setNotes] = useState('');
+  const [billingBranches, setBillingBranches] = useState<PartyBranch[]>([]);
+  const [selectedPartyBranchId, setSelectedPartyBranchId] = useState('');
+  const [loadingBranches, setLoadingBranches] = useState(false);
 
   const loadInitialData = useCallback(async () => {
     try {
@@ -91,18 +94,44 @@ export default function InvoiceManagement() {
 
   const pendingTotalCount = pendingTrips.reduce((sum, p) => sum + p.tripCount, 0);
 
-  const handlePartySelect = (partyName: string) => {
+  const handlePartySelect = async (partyName: string) => {
     setSelectedParty(partyName);
     setSelectedTrips([]);
     setShowCreateForm(false);
+    setSelectedPartyBranchId('');
+    setBillingBranches([]);
 
     const partyMaster = parties.find((p) => p.name === partyName);
     if (partyMaster) {
       setPartyGstIn(partyMaster.gstIn || '');
       setPartyAddress(partyMaster.address || '');
+      setLoadingBranches(true);
+      try {
+        const brs = await partiesApi.listPartyBranches(partyMaster.id);
+        setBillingBranches(brs);
+        if (brs.length === 1) {
+          setSelectedPartyBranchId(brs[0].id);
+          setPartyAddress(brs[0].address || partyMaster.address || '');
+        }
+      } catch {
+        setBillingBranches([]);
+      } finally {
+        setLoadingBranches(false);
+      }
     } else {
       setPartyGstIn('');
       setPartyAddress('');
+    }
+  };
+
+  const handleBillingBranchChange = (branchId: string) => {
+    setSelectedPartyBranchId(branchId);
+    setSelectedTrips([]);
+    const b = billingBranches.find((x) => x.id === branchId);
+    const pm = parties.find((p) => p.name === selectedParty);
+    if (b && pm) {
+      setPartyAddress(b.address || pm.address || '');
+      setPartyGstIn(pm.gstIn || '');
     }
   };
 
@@ -118,14 +147,24 @@ export default function InvoiceManagement() {
       return;
     }
 
+    const partyMaster = parties.find((p) => p.name === selectedParty);
+    const resolvedBranchId =
+      billingBranches.length === 1
+        ? billingBranches[0].id
+        : selectedPartyBranchId;
+    if (billingBranches.length > 1 && !resolvedBranchId) {
+      setError('Select a billing branch before creating the invoice');
+      return;
+    }
+
     setCreatingInvoice(true);
     setError(null);
 
     try {
-      const partyMaster = parties.find((p) => p.name === selectedParty);
       const invoiceData: CreateInvoiceRequest = {
         tripIds: selectedTrips,
         partyId: partyMaster?.id,
+        partyBranchId: resolvedBranchId || undefined,
         partyName: selectedParty,
         partyGstIn: partyGstIn || undefined,
         partyAddress: partyAddress || undefined,
@@ -142,6 +181,8 @@ export default function InvoiceManagement() {
       setPartyAddress('');
       setGstRate('12');
       setNotes('');
+      setBillingBranches([]);
+      setSelectedPartyBranchId('');
       setShowCreateForm(false);
 
       await loadInitialData();
@@ -245,8 +286,16 @@ export default function InvoiceManagement() {
   };
 
   const selectedPartyData = pendingTrips.find((p) => p.partyName === selectedParty);
+  const resolvedBranchId =
+    billingBranches.length === 1 ? billingBranches[0].id : selectedPartyBranchId;
+  const tripsForBranch =
+    selectedPartyData?.trips.filter((trip) => {
+      if (billingBranches.length <= 1) return true;
+      if (!resolvedBranchId) return false;
+      return trip.partyBranchId === resolvedBranchId;
+    }) ?? [];
   const selectedTripsData =
-    selectedPartyData?.trips.filter((trip) => selectedTrips.includes(trip.id)) || [];
+    tripsForBranch.filter((trip) => selectedTrips.includes(trip.id)) || [];
   const getTripAmount = (trip: { effectiveFreight?: number; freight?: number | null }) =>
     trip.effectiveFreight ?? trip.freight ?? 0;
   const totalFreight = selectedTripsData.reduce((sum, trip) => sum + getTripAmount(trip), 0);
@@ -351,15 +400,64 @@ export default function InvoiceManagement() {
                         ))}
                     </SelectContent>
                   </Select>
+                  {loadingBranches && selectedParty && (
+                    <p className="text-xs text-slate-500">Loading billing branches…</p>
+                  )}
                 </div>
+
+                {selectedParty && selectedPartyData && billingBranches.length > 1 && (
+                  <div className="space-y-2">
+                    <Label htmlFor="branch-select" className="text-slate-700">
+                      Billing branch
+                    </Label>
+                    <Select
+                      value={selectedPartyBranchId}
+                      onValueChange={handleBillingBranchChange}
+                    >
+                      <SelectTrigger id="branch-select" className="h-11 rounded-lg">
+                        <SelectValue placeholder="Select ledger / location…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {billingBranches.map((b) => (
+                          <SelectItem key={b.id} value={b.id}>
+                            {b.locationLabel ? `${b.locationLabel} — ` : ''}
+                            {b.fullLedgerName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-slate-500">
+                      Only trips tagged with this billing branch are listed. GSTIN stays on the party; invoice
+                      “Bill to” uses the branch ledger name and address.
+                    </p>
+                  </div>
+                )}
+
+                {selectedParty && selectedPartyData && billingBranches.length === 1 && (
+                  <p className="text-sm text-slate-600">
+                    Billing ledger:{' '}
+                    <span className="font-medium text-slate-900">{billingBranches[0].fullLedgerName}</span>
+                  </p>
+                )}
 
                 {selectedParty && selectedPartyData && (
                   <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/50 p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Trips for {selectedParty}
+                      {billingBranches.length > 1 && resolvedBranchId
+                        ? ` (${tripsForBranch.length} for this branch)`
+                        : null}
                     </p>
+                    {billingBranches.length > 1 && !resolvedBranchId ? (
+                      <p className="text-sm text-amber-800">Select a billing branch above to load trips.</p>
+                    ) : tripsForBranch.length === 0 ? (
+                      <p className="text-sm text-slate-600">
+                        No pending trips for this branch. Assign trips to this billing branch in trip details, or
+                        move another trip to INVOICING.
+                      </p>
+                    ) : (
                     <div className="space-y-2">
-                      {selectedPartyData.trips.map((trip) => (
+                      {tripsForBranch.map((trip) => (
                         <label
                           key={trip.id}
                           htmlFor={`trip-${trip.id}`}
@@ -396,6 +494,7 @@ export default function InvoiceManagement() {
                         </label>
                       ))}
                     </div>
+                    )}
 
                     {selectedTrips.length > 0 && !showCreateForm && (
                       <Button

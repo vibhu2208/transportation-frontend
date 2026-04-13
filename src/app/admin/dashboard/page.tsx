@@ -3,12 +3,11 @@
 import { useState, useEffect, Suspense, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { ChevronDown, Loader2 } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { UserRole } from '@/types/auth';
 import { AdminTripTable } from '@/components/trips/AdminTripTable';
 import WhatsAppTestDashboard from '@/components/whatsapp/WhatsAppTestDashboard';
-import { ExportButton } from '@/components/admin/ExportButton';
 import { VehicleDashboard } from '@/modules/analytics/VehicleDashboard';
 import InvoiceManagement from '@/modules/invoices/InvoiceManagement';
 import MoneyReceiptPage from '@/modules/money-receipt/MoneyReceiptPage';
@@ -49,6 +48,7 @@ function AdminDashboardInner() {
   const [settingsSubTab, setSettingsSubTab] = useState<SettingsSubTab>('vendors');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showCreateTrip, setShowCreateTrip] = useState(false);
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -161,20 +161,6 @@ function AdminDashboardInner() {
             </nav>
           </div>
 
-          {/* Export Section */}
-          <div className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8 shadow-md">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">Data Export Center</h2>
-                <p className="text-sm text-slate-600 mt-1">Generate detailed reports in Excel format for business analysis</p>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
-                <ExportButton type="trips" />
-                <ExportButton type="vendors" />
-              </div>
-            </div>
-          </div>
-
           {/* Tab Content */}
           {activeTab === 'overview' && (
             <AdminDashboardOverview
@@ -195,11 +181,11 @@ function AdminDashboardInner() {
 
           {activeTab === 'manage' && (
             <div className="space-y-6">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white border border-slate-200/80 rounded-xl p-4 shadow-md">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-md">
                 <div className="min-w-0">
                   <h2 className="text-lg font-semibold text-slate-900">Manage Trips</h2>
                   <p className="text-sm text-slate-600 mt-1">
-                    Create a new trip or update operational/accounting details.
+                    Create a new trip or update operational and accounting details from the register below.
                   </p>
                 </div>
                 <Button
@@ -238,7 +224,34 @@ function AdminDashboardInner() {
                 </div>
               )}
 
-              <BulkTripUploadPanel onTripsCreated={() => setRefreshTrigger((prev) => prev + 1)} />
+              <div className="rounded-xl border border-slate-200/80 bg-white shadow-md overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setBulkUploadOpen((o) => !o)}
+                  className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left transition-colors hover:bg-slate-50 sm:px-6"
+                  aria-expanded={bulkUploadOpen}
+                >
+                  <div className="min-w-0">
+                    <span className="text-base font-semibold text-slate-900">Bulk upload (Excel)</span>
+                    <p className="text-sm text-slate-600 mt-0.5">
+                      Import many trips from a spreadsheet — expand when you need it
+                    </p>
+                  </div>
+                  <ChevronDown
+                    className={`h-5 w-5 shrink-0 text-slate-500 transition-transform duration-200 ${
+                      bulkUploadOpen ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
+                {bulkUploadOpen && (
+                  <div className="border-t border-slate-100 bg-slate-50/40 px-4 py-5 sm:px-6">
+                    <BulkTripUploadPanel
+                      embedded
+                      onTripsCreated={() => setRefreshTrigger((prev) => prev + 1)}
+                    />
+                  </div>
+                )}
+              </div>
 
               <AdminTripTable trips={adminTrips} onRefresh={() => setRefreshTrigger((prev) => prev + 1)} />
             </div>

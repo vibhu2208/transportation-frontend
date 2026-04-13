@@ -2,8 +2,22 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, Phone, Mail, MapPin, IndianRupee, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  Loader2,
+  Phone,
+  Mail,
+  MapPin,
+  IndianRupee,
+  X,
+  GitBranch,
+  Plus,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { partiesApi } from './api';
 import type { PartyDetailResponse } from './types';
 
@@ -31,6 +45,13 @@ export function PartyDetailView(props: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [branchFormOpen, setBranchFormOpen] = useState(false);
+  const [branchSaving, setBranchSaving] = useState(false);
+  const [branchFormError, setBranchFormError] = useState<string | null>(null);
+  const [newBranchLedger, setNewBranchLedger] = useState('');
+  const [newBranchLocation, setNewBranchLocation] = useState('');
+  const [newBranchAddress, setNewBranchAddress] = useState('');
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -51,6 +72,15 @@ export function PartyDetailView(props: Props) {
     };
   }, [partyId]);
 
+  useEffect(() => {
+    if (!branchFormOpen) {
+      setNewBranchLedger('');
+      setNewBranchLocation('');
+      setNewBranchAddress('');
+      setBranchFormError(null);
+    }
+  }, [branchFormOpen]);
+
   const fmtMoney = (n: number) =>
     `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -58,6 +88,34 @@ export function PartyDetailView(props: Props) {
     n == null || Number.isNaN(Number(n))
       ? '—'
       : Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+
+  async function handleAddBranch(e: React.FormEvent) {
+    e.preventDefault();
+    const ledger = newBranchLedger.trim();
+    if (!ledger) {
+      setBranchFormError('Ledger name is required.');
+      return;
+    }
+    setBranchSaving(true);
+    setBranchFormError(null);
+    try {
+      await partiesApi.createPartyBranch(partyId, {
+        fullLedgerName: ledger,
+        locationLabel: newBranchLocation.trim() || undefined,
+        address: newBranchAddress.trim() || undefined,
+      });
+      const res = await partiesApi.getPartyDetail(partyId);
+      setData(res);
+      setBranchFormOpen(false);
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { message?: string | string[] } } };
+      const m = ax.response?.data?.message;
+      const msg = Array.isArray(m) ? m.join(', ') : m ?? 'Could not add branch';
+      setBranchFormError(msg);
+    } finally {
+      setBranchSaving(false);
+    }
+  }
 
   const headerActions = (
     <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -159,6 +217,141 @@ export function PartyDetailView(props: Props) {
                 </div>
               </div>
               <div className="rounded-xl border border-slate-200 p-4">
+                <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                      <GitBranch className="h-4 w-4 shrink-0 text-emerald-700" />
+                      Billing branches
+                    </h3>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Company GST is on the party; each branch has its own ledger name and address on invoices.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 border-emerald-200 text-emerald-800 hover:bg-emerald-50"
+                    onClick={() => setBranchFormOpen((o) => !o)}
+                  >
+                    <Plus className="mr-1.5 h-4 w-4" />
+                    Add branch
+                  </Button>
+                </div>
+
+                {branchFormOpen && (
+                  <form
+                    onSubmit={handleAddBranch}
+                    className="mb-4 space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/50 p-4"
+                  >
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="sm:col-span-2">
+                        <Label htmlFor="pb-ledger" className="text-slate-700">
+                          Ledger name (on invoice) <span className="text-red-600">*</span>
+                        </Label>
+                        <Input
+                          id="pb-ledger"
+                          value={newBranchLedger}
+                          onChange={(e) => setNewBranchLedger(e.target.value)}
+                          placeholder="e.g. AMUL — Rudrapur unit"
+                          className="mt-1"
+                          disabled={branchSaving}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="pb-location" className="text-slate-700">
+                          Location label
+                        </Label>
+                        <Input
+                          id="pb-location"
+                          value={newBranchLocation}
+                          onChange={(e) => setNewBranchLocation(e.target.value)}
+                          placeholder="e.g. RUDRAPUR"
+                          className="mt-1"
+                          disabled={branchSaving}
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Label htmlFor="pb-address" className="text-slate-700">
+                          Branch address
+                        </Label>
+                        <Textarea
+                          id="pb-address"
+                          value={newBranchAddress}
+                          onChange={(e) => setNewBranchAddress(e.target.value)}
+                          placeholder="Billing address for this ledger"
+                          rows={2}
+                          className="mt-1 min-h-[72px] resize-y bg-white"
+                          disabled={branchSaving}
+                        />
+                      </div>
+                    </div>
+                    {branchFormError && <p className="text-sm text-red-600">{branchFormError}</p>}
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="submit" size="sm" disabled={branchSaving}>
+                        {branchSaving ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Saving…
+                          </>
+                        ) : (
+                          'Save branch'
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={branchSaving}
+                        onClick={() => setBranchFormOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                )}
+
+                {(data.branchBreakdown ?? []).length === 0 ? (
+                  <p className="text-sm text-slate-500">
+                    No activity by branch yet. Add a branch above, then assign trips to it from the trip list.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {(data.branchBreakdown ?? []).map((row, idx) => (
+                      <div
+                        key={row.branch?.id ?? `unassigned-${idx}`}
+                        className="rounded-lg border border-slate-100 bg-slate-50/80 p-3"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div>
+                            <p className="font-medium text-slate-900">
+                              {row.unassigned
+                                ? 'Unassigned (no billing branch on trip/invoice)'
+                                : row.branch?.locationLabel || row.branch?.fullLedgerName}
+                            </p>
+                            {!row.unassigned && row.branch?.locationLabel && (
+                              <p className="text-xs text-slate-600">{row.branch.fullLedgerName}</p>
+                            )}
+                            {!row.unassigned && row.branch?.address && (
+                              <p className="mt-1 text-xs text-slate-600 whitespace-pre-wrap">{row.branch.address}</p>
+                            )}
+                          </div>
+                          <div className="text-right text-xs tabular-nums">
+                            <div className="text-slate-500">Due (this branch)</div>
+                            <div className="font-semibold text-amber-800">{fmtMoney(row.remainingBalance)}</div>
+                            <div className="mt-1 text-slate-500">
+                              {row.tripCount} trip{row.tripCount !== 1 ? 's' : ''} · {row.invoices.length} invoice
+                              {row.invoices.length !== 1 ? 's' : ''}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-slate-200 p-4">
                 <h3 className="mb-3 text-sm font-semibold text-slate-900">Contact</h3>
                 <div className="space-y-2 text-sm text-slate-700">
                   {data.party.gstIn && (
@@ -198,6 +391,7 @@ export function PartyDetailView(props: Props) {
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 text-left">
                     <th className="px-3 py-2 font-medium text-slate-700">Trip no.</th>
+                    <th className="px-3 py-2 font-medium text-slate-700">Branch</th>
                     <th className="px-3 py-2 font-medium text-slate-700">Date</th>
                     <th className="px-3 py-2 font-medium text-slate-700">Route</th>
                     <th className="px-3 py-2 font-medium text-slate-700">Vehicle</th>
@@ -217,7 +411,7 @@ export function PartyDetailView(props: Props) {
                 <tbody>
                   {data.trips.length === 0 ? (
                     <tr>
-                      <td colSpan={15} className="px-3 py-8 text-center text-slate-500">
+                      <td colSpan={16} className="px-3 py-8 text-center text-slate-500">
                         No trips for this party.
                       </td>
                     </tr>
@@ -225,6 +419,9 @@ export function PartyDetailView(props: Props) {
                     data.trips.map((tr) => (
                       <tr key={tr.id} className="border-b border-slate-100 align-top last:border-0">
                         <td className="px-3 py-2 font-mono text-xs">{tr.tripNo}</td>
+                        <td className="max-w-[140px] px-3 py-2 text-xs text-slate-700">
+                          {tr.branchLocationLabel || tr.branchLedgerName || '—'}
+                        </td>
                         <td className="whitespace-nowrap px-3 py-2 text-slate-600">
                           {new Date(tr.date).toLocaleDateString('en-IN')}
                         </td>
@@ -272,6 +469,7 @@ export function PartyDetailView(props: Props) {
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 text-left">
                     <th className="px-3 py-2 font-medium text-slate-700">Invoice</th>
+                    <th className="px-3 py-2 font-medium text-slate-700">Branch</th>
                     <th className="px-3 py-2 font-medium text-slate-700">Date</th>
                     <th className="px-3 py-2 text-right font-medium text-slate-700">Grand total</th>
                     <th className="px-3 py-2 text-right font-medium text-slate-700">Paid</th>
@@ -283,7 +481,7 @@ export function PartyDetailView(props: Props) {
                 <tbody>
                   {data.invoices.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-3 py-8 text-center text-slate-500">
+                      <td colSpan={8} className="px-3 py-8 text-center text-slate-500">
                         No invoices for this party.
                       </td>
                     </tr>
@@ -291,6 +489,11 @@ export function PartyDetailView(props: Props) {
                     data.invoices.map((inv) => (
                       <tr key={inv.id} className="border-b border-slate-100 last:border-0">
                         <td className="px-3 py-2 font-mono text-xs">{inv.invoiceNo}</td>
+                        <td className="max-w-[160px] px-3 py-2 text-xs text-slate-700">
+                          {(data.partyBranches ?? []).find((b) => b.id === inv.partyBranchId)?.locationLabel ||
+                            (data.partyBranches ?? []).find((b) => b.id === inv.partyBranchId)?.fullLedgerName ||
+                            '—'}
+                        </td>
                         <td className="px-3 py-2 text-slate-600">
                           {new Date(inv.invoiceDate).toLocaleDateString('en-IN')}
                         </td>
@@ -348,7 +551,9 @@ export function PartyDetailView(props: Props) {
                         <td className="px-3 py-2 font-mono text-xs">{gr.tripNo}</td>
                         <td className="px-3 py-2 font-mono text-xs">{gr.invoiceNo ?? '—'}</td>
                         <td className="px-3 py-2 text-right text-xs tabular-nums text-slate-600">
-                          {gr.totalFreight || gr.freight || '—'}
+                          {gr.freight != null && gr.freight !== undefined
+                            ? `₹${Number(gr.freight).toLocaleString('en-IN')}`
+                            : '—'}
                         </td>
                       </tr>
                     ))

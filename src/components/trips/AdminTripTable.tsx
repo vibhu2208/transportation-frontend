@@ -3,16 +3,44 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { api } from '@/lib/api';
-import { OperationsUpdateModal } from './OperationsUpdateModal';
-import { AccountsUpdateModal } from './AccountsUpdateModal';
 import { GRDetailsModal } from './GRDetailsModal';
 import { goodsReceiptApi } from '@/lib/api-client';
 import { GoodsReceipt } from '@/types/goods-receipt';
 import toast from 'react-hot-toast';
+import { partiesApi } from '@/modules/parties/api';
+import type { PartyBranch } from '@/modules/parties/types';
+
+function todayInputMax(): string {
+  const n = new Date();
+  const y = n.getFullYear();
+  const m = String(n.getMonth() + 1).padStart(2, '0');
+  const d = String(n.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function isCalendarDateAfterToday(isoDay: string | null | undefined): boolean {
+  if (!isoDay) return false;
+  const day = isoDay.split('T')[0];
+  return day > todayInputMax();
+}
+
+function calendarDay(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = iso.split('T')[0];
+  return d || null;
+}
+
+/** Invalid when both set and POD is strictly before GR. */
+function isPodDateBeforeGrDate(podDay: string | null | undefined, grDay: string | null | undefined): boolean {
+  if (!podDay || !grDay) return false;
+  return podDay < grDay;
+}
 
 interface AdminTripData {
   id: string;
   vendorId?: string;
+  partyId?: string | null;
+  partyBranchId?: string | null;
   tripNo: string;
   date: string;
   vendorName: string;
@@ -21,14 +49,22 @@ interface AdminTripData {
   toLocation: string;
   vehicleNumber: string;
   grLrNo?: string;
+  grReceivedDate?: string;
+  podReceivedDate?: string;
   freight?: number;
   advance?: number;
   initialExpense?: number;
   tollExpense?: number;
+  otherCharges?: number;
+  labourCharges?: number;
+  detentionLoading?: number;
+  detentionUL?: number;
   totalExpense?: number;
   profitLoss?: number;
   billNo?: string;
   billDate?: string;
+  branchName?: string;
+  ewayDate?: string;
   driverName?: string;
   driverPhone?: string;
   startLocation?: string;
@@ -41,6 +77,8 @@ interface AdminTripData {
   party?: string;
   notes?: string;
   status: string;
+  invoiceId?: string | null;
+  moneyReceiptId?: string | null;
   createdAt: string;
   remarks?: string;
 }
@@ -51,52 +89,27 @@ interface AdminTripTableProps {
 }
 
 export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
-  const [selectedTrip, setSelectedTrip] = useState<string | null>(null);
-  const [updateMode, setUpdateMode] = useState<'operations' | 'accounts' | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [expandedTrip, setExpandedTrip] = useState<string | null>(null);
   const [grData, setGrData] = useState<Record<string, GoodsReceipt[]>>({});
   const [showTripModal, setShowTripModal] = useState<AdminTripData | null>(null);
   const [showGRModal, setShowGRModal] = useState<AdminTripData | null>(null);
-  const [showOperationsModal, setShowOperationsModal] = useState<AdminTripData | null>(null);
-  const [showAccountsModal, setShowAccountsModal] = useState<AdminTripData | null>(null);
   const [savingField, setSavingField] = useState<string | null>(null);
-  
+  const [partyBranchOptions, setPartyBranchOptions] = useState<PartyBranch[]>([]);
+  /** When trip has partyName but no partyId (legacy rows), resolve Party id for branch dropdown. */
+  const [resolvedPartyIdFromName, setResolvedPartyIdFromName] = useState<string | null>(null);
+  const [partyNameLookupStatus, setPartyNameLookupStatus] = useState<'idle' | 'loading' | 'done'>('idle');
+
   // Filter states
   const [filters, setFilters] = useState({
     to: '',
     from: '',
     vehicleNumber: '',
     party: '',
-    date: ''
+    date: '',
+    grLrNo: '',
+    billNo: '',
   });
-
-  const handleOperationsUpdate = (trip: AdminTripData) => {
-    setShowOperationsModal(trip);
-    setShowTripModal(null); // Close trip modal when opening operations modal
-  };
-
-  const handleAccountsUpdate = (trip: AdminTripData) => {
-    setShowAccountsModal(trip);
-    setShowTripModal(null); // Close trip modal when opening accounts modal
-  };
-
-  const handleBackToTripDetails = (trip: AdminTripData) => {
-    setShowTripModal(trip);
-    setShowOperationsModal(null);
-    setShowAccountsModal(null);
-  };
-
-  const handleUpdateComplete = () => {
-    setShowOperationsModal(null);
-    setShowAccountsModal(null);
-    onRefresh();
-  };
-
-  const handleModalCancel = () => {
-    setShowOperationsModal(null);
-    setShowAccountsModal(null);
-  };
 
   const handleFilterChange = (field: string, value: string) => {
     setFilters(prev => ({ ...prev, [field]: value }));
@@ -108,17 +121,102 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
       from: '',
       vehicleNumber: '',
       party: '',
-      date: ''
+      date: '',
+      grLrNo: '',
+      billNo: '',
     });
   };
 
-  const filteredTrips = trips.filter(trip => {
+  useEffect(() => {
+    if (!showTripModal) {
+      setResolvedPartyIdFromName(null);
+      setPartyNameLookupStatus('idle');
+      return;
+    }
+    if (showTripModal.partyId) {
+      setResolvedPartyIdFromName(null);
+      setPartyNameLookupStatus('done');
+      return;
+    }
+    const pn = showTripModal.partyName?.trim();
+    if (!pn) {
+      setResolvedPartyIdFromName(null);
+      setPartyNameLookupStatus('done');
+      return;
+    }
+    setPartyNameLookupStatus('loading');
+    let cancelled = false;
+    (async () => {
+      try {
+        const parties = await partiesApi.getParties();
+        const hit = parties.find((p) => p.name.trim().toLowerCase() === pn.toLowerCase());
+        if (!cancelled) {
+          setResolvedPartyIdFromName(hit?.id ?? null);
+          setPartyNameLookupStatus('done');
+        }
+      } catch {
+        if (!cancelled) {
+          setResolvedPartyIdFromName(null);
+          setPartyNameLookupStatus('done');
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showTripModal?.id, showTripModal?.partyId, showTripModal?.partyName]);
+
+  const effectivePartyId = showTripModal?.partyId ?? resolvedPartyIdFromName ?? undefined;
+
+  /** Until lookup finishes, legacy trips (name but no id) should not flash the free-text branch field. */
+  const awaitingPartyResolve =
+    !!showTripModal &&
+    !showTripModal.partyId &&
+    !!showTripModal.partyName?.trim() &&
+    partyNameLookupStatus !== 'done';
+
+  /** Show free-text branch when there is no party name, or lookup finished (avoids stale "loading" when switching trips). */
+  const canShowFreeTextBranch =
+    !showTripModal?.partyName?.trim() || partyNameLookupStatus === 'done';
+
+  useEffect(() => {
+    if (!effectivePartyId) {
+      setPartyBranchOptions([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const brs = await partiesApi.listPartyBranches(effectivePartyId);
+        if (!cancelled) setPartyBranchOptions(brs);
+      } catch {
+        if (!cancelled) setPartyBranchOptions([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [effectivePartyId]);
+
+  useEffect(() => {
+    if (!showTripModal) return;
+    const fresh = trips.find((t) => t.id === showTripModal.id);
+    if (fresh) {
+      setShowTripModal(fresh);
+    }
+  }, [trips, showTripModal?.id]);
+
+  const filteredTrips = trips.filter((trip) => {
+    const gr = (trip.grLrNo || '').toLowerCase();
+    const bill = (trip.billNo || '').toLowerCase();
     return (
       (!filters.to || trip.toLocation.toLowerCase().includes(filters.to.toLowerCase())) &&
       (!filters.from || trip.fromLocation.toLowerCase().includes(filters.from.toLowerCase())) &&
       (!filters.vehicleNumber || trip.vehicleNumber.toLowerCase().includes(filters.vehicleNumber.toLowerCase())) &&
       (!filters.party || trip.partyName.toLowerCase().includes(filters.party.toLowerCase())) &&
-      (!filters.date || trip.date.includes(filters.date))
+      (!filters.date || trip.date.includes(filters.date)) &&
+      (!filters.grLrNo || gr.includes(filters.grLrNo.toLowerCase().trim())) &&
+      (!filters.billNo || bill.includes(filters.billNo.toLowerCase().trim()))
     );
   });
 
@@ -144,40 +242,63 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
     return `₹${amount.toFixed(2)}`;
   };
 
+  const tripExpenseTotal = (t: AdminTripData) =>
+    (t.initialExpense ?? 0) +
+    (t.tollExpense ?? 0) +
+    (t.labourCharges ?? 0) +
+    (t.otherCharges ?? 0) +
+    (t.detentionLoading ?? 0) +
+    (t.detentionUL ?? 0);
+
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'in_progress': return 'bg-blue-100 text-blue-800';
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'invoicing': return 'bg-purple-100 text-purple-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'pod_pending':
+      case 'pending':
+        return 'bg-amber-100 text-amber-900';
+      case 'invoicing':
+        return 'bg-violet-100 text-violet-900';
+      case 'payment_pending':
+        return 'bg-sky-100 text-sky-900';
+      case 'completed':
+        return 'bg-emerald-100 text-emerald-900';
+      case 'in_progress':
+        return 'bg-blue-100 text-blue-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusDisplay = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'pending': return 'Pending';
-      case 'in_progress': return 'In Transit';
-      case 'completed': return 'Completed';
-      case 'invoicing': return 'Invoicing';
-      case 'cancelled': return 'Cancelled';
-      default: return status;
+      case 'pod_pending':
+      case 'pending':
+        return 'POD pending';
+      case 'invoicing':
+        return 'Invoicing';
+      case 'payment_pending':
+        return 'Payment pending';
+      case 'completed':
+        return 'Completed';
+      case 'in_progress':
+        return 'In transit';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return status.replace(/_/g, ' ');
     }
   };
 
-  const handleStatusChange = async (tripId: string, newStatus: string) => {
+  const handleCancelTrip = async (tripId: string) => {
+    if (!window.confirm('Mark this trip as cancelled?')) return;
     setUpdatingStatus(tripId);
     try {
-      const token = localStorage.getItem('auth_token');
-      await api.patch(`/trips/${tripId}`, { status: newStatus }, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      await api.patch(`/trips/${tripId}`, { status: 'CANCELLED' });
       onRefresh();
     } catch (error) {
-      console.error('Error updating status:', error);
+      console.error('Error cancelling trip:', error);
+      toast.error('Could not cancel trip');
     } finally {
       setUpdatingStatus(null);
     }
@@ -218,12 +339,39 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
     const key = `${trip.id}:${String(field)}`;
     setSavingField(key);
     try {
+      if (field === 'grReceivedDate' || field === 'podReceivedDate') {
+        const v = value as string | null | undefined;
+        if (v && isCalendarDateAfterToday(v)) {
+          toast.error('Date cannot be later than today');
+          return;
+        }
+        const grDay =
+          field === 'grReceivedDate' ? (v ? calendarDay(v) : null) : calendarDay(trip.grReceivedDate);
+        const podDay =
+          field === 'podReceivedDate' ? (v ? calendarDay(v) : null) : calendarDay(trip.podReceivedDate);
+        if (isPodDateBeforeGrDate(podDay, grDay)) {
+          toast.error('POD received date cannot be before GR received date');
+          return;
+        }
+      }
+
       let endpoint = `/trips/${trip.id}`;
       let payload: Record<string, unknown> = { [field]: value };
 
-      if (field === 'freight' || field === 'billNo' || field === 'billDate') {
+      if (
+        field === 'freight' ||
+        field === 'billNo' ||
+        field === 'billDate' ||
+        field === 'branchName' ||
+        field === 'ewayDate'
+      ) {
         endpoint = `/trips/${trip.id}/accounts`;
-      } else if (field === 'grLrNo' || field === 'tollExpense') {
+      } else if (
+        field === 'grLrNo' ||
+        field === 'tollExpense' ||
+        field === 'grReceivedDate' ||
+        field === 'podReceivedDate'
+      ) {
         endpoint = `/trips/${trip.id}/operations`;
       }
 
@@ -237,78 +385,102 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
-        <h3 className="text-base sm:text-lg font-medium text-gray-900">Transportation Operations Register</h3>
-        <p className="mt-1 text-sm text-gray-500">Complete lifecycle view of all trips with operational and financial data</p>
+    <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-md">
+      <div className="border-b border-slate-200/80 px-4 py-4 sm:px-6">
+        <h3 className="text-base font-semibold text-slate-900 sm:text-lg">Transportation Operations Register</h3>
+        <p className="mt-1 text-sm text-slate-600">
+          Search and open a trip for operations, GR/POD dates, and billing.
+        </p>
       </div>
 
       {/* Filters Section */}
-      <div className="px-4 sm:px-6 py-4 bg-gray-50 border-b border-gray-200">
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="text-sm font-medium text-gray-900">Filter Trips</h4>
+      <div className="border-b border-slate-200/80 bg-slate-50/80 px-4 py-4 sm:px-6">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h4 className="text-sm font-semibold text-slate-900">Filter trips</h4>
           <button
+            type="button"
             onClick={clearFilters}
-            className="text-sm text-gray-500 hover:text-gray-700"
+            className="text-sm font-medium text-emerald-700 hover:text-emerald-800"
           >
-            Clear All
+            Clear all
           </button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">To Location</label>
+            <label className="mb-1 block text-xs font-medium text-slate-700">To location</label>
             <input
               type="text"
               value={filters.to}
               onChange={(e) => handleFilterChange('to', e.target.value)}
-              placeholder="Search destination..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Destination…"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">From Location</label>
+            <label className="mb-1 block text-xs font-medium text-slate-700">From location</label>
             <input
               type="text"
               value={filters.from}
               onChange={(e) => handleFilterChange('from', e.target.value)}
-              placeholder="Search origin..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Origin…"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Vehicle Number</label>
+            <label className="mb-1 block text-xs font-medium text-slate-700">Vehicle number</label>
             <input
               type="text"
               value={filters.vehicleNumber}
               onChange={(e) => handleFilterChange('vehicleNumber', e.target.value)}
-              placeholder="Search vehicle..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Vehicle…"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Party Name</label>
+            <label className="mb-1 block text-xs font-medium text-slate-700">Party name</label>
             <input
               type="text"
               value={filters.party}
               onChange={(e) => handleFilterChange('party', e.target.value)}
-              placeholder="Search party..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Party…"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
+            <label className="mb-1 block text-xs font-medium text-slate-700">Trip date</label>
             <input
               type="text"
               value={filters.date}
               onChange={(e) => handleFilterChange('date', e.target.value)}
-              placeholder="Search date..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="e.g. 2026-04-09"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-700">GR / LR no.</label>
+            <input
+              type="text"
+              value={filters.grLrNo}
+              onChange={(e) => handleFilterChange('grLrNo', e.target.value)}
+              placeholder="Match GR or LR…"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-700">Party bill no.</label>
+            <input
+              type="text"
+              value={filters.billNo}
+              onChange={(e) => handleFilterChange('billNo', e.target.value)}
+              placeholder="Party bill…"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             />
           </div>
         </div>
         {filteredTrips.length !== trips.length && (
-          <div className="mt-3 text-sm text-gray-600">
-            Showing {filteredTrips.length} of {trips.length} trips
+          <div className="mt-3 text-sm text-slate-600">
+            Showing <span className="font-medium text-slate-800">{filteredTrips.length}</span> of {trips.length}{' '}
+            trips
           </div>
         )}
       </div>
@@ -334,11 +506,9 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                 <p className="text-xs text-gray-600 mt-1">
                   {trip.fromLocation} → {trip.toLocation}
                 </p>
-                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600">
-                  <span>{trip.vehicleNumber}</span>
-                  <span className="text-gray-400">|</span>
-                  <span className="truncate max-w-[12rem]">{trip.vendorName}</span>
-                </div>
+                <p className="mt-2 text-xs text-gray-600">
+                  <span className="font-medium text-gray-700">Vehicle:</span> {trip.vehicleNumber}
+                </p>
                 {(needsAdvanceAlert(trip) || needsPaymentPendingAlert(trip)) && (
                   <p className="mt-2 inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
                     {needsAdvanceAlert(trip) ? 'Advance pending (Market)' : 'Payment pending'}
@@ -354,11 +524,11 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                 <tr>
                   <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trip No</th>
                   <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vendor</th>
                   <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Party</th>
                   <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">From</th>
                   <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">To</th>
                   <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vehicle</th>
+                  <th className="px-3 sm:px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -373,9 +543,6 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                     </td>
                     <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-sm text-gray-500">
                       {trip.date}
-                    </td>
-                    <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-sm text-gray-900">
-                      {trip.vendorName}
                     </td>
                     <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-sm text-gray-900">
                       <div className="flex items-center gap-2">
@@ -395,6 +562,13 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                     </td>
                     <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                       {trip.vehicleNumber}
+                    </td>
+                    <td className="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-right text-sm">
+                      <span
+                        className={`inline-flex max-w-[11rem] justify-end rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(trip.status)}`}
+                      >
+                        {getStatusDisplay(trip.status)}
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -422,81 +596,158 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
 
       {/* Trip Detail Modal */}
       {showTripModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 px-2 sm:px-4 py-4 sm:py-8">
-          <div className="relative mx-auto p-4 sm:p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white max-h-[calc(100dvh-2rem)] overflow-y-auto">
-            <div className="mt-0 sm:mt-1">
-              <div className="flex justify-between items-start gap-2 mb-4">
-                <h3 className="text-base sm:text-lg font-medium text-gray-900 pr-2">Trip Details - {showTripModal.tripNo}</h3>
-                <button
-                  onClick={() => setShowTripModal(null)}
-                  className="text-gray-400 hover:text-gray-500"
-                >
-                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 px-3 py-6 backdrop-blur-[2px] sm:px-4 sm:py-10">
+          <div className="relative w-full max-w-4xl rounded-2xl border border-gray-200/80 bg-white shadow-xl shadow-slate-200/50 max-h-[calc(100dvh-3rem)] overflow-y-auto">
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-gray-100 bg-white/95 px-5 py-4 backdrop-blur-sm sm:px-6">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Trip details</p>
+                <h3 className="text-lg font-semibold tracking-tight text-gray-900 sm:text-xl">{showTripModal.tripNo}</h3>
               </div>
+              <button
+                type="button"
+                onClick={() => setShowTripModal(null)}
+                className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                aria-label="Close"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                {/* Basic Information */}
-                <div className="col-span-1 md:col-span-2 lg:col-span-3">
-                  <h4 className="font-semibold text-gray-900 mb-3 border-b pb-2">Basic Information</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    <div>
-                      <span className="text-sm font-medium text-gray-500">Trip No:</span>
-                      <p className="text-sm text-gray-900">{showTripModal.tripNo}</p>
+            <div className="space-y-5 px-5 py-5 sm:px-6 sm:py-6">
+              {/* Basic + operations */}
+              <section className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50/40 shadow-sm">
+                <div className="border-b border-gray-200 bg-white px-4 py-3">
+                  <h4 className="text-sm font-semibold text-gray-900">Trip &amp; operations</h4>
+                  <p className="mt-0.5 text-xs text-gray-500">Reference data and GR/POD dates (max. today)</p>
+                </div>
+                <div className="space-y-6 p-4 sm:p-5">
+                  <div>
+                    <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Trip snapshot</p>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      {[
+                        ['Trip no.', showTripModal.tripNo],
+                        ['Date', showTripModal.date],
+                        ['Vendor', showTripModal.vendorName],
+                        ['Party', showTripModal.partyName],
+                        ['From', showTripModal.fromLocation],
+                        ['To', showTripModal.toLocation],
+                        ['Vehicle', showTripModal.vehicleNumber],
+                      ].map(([k, v]) => (
+                        <div key={String(k)}>
+                          <span className="block text-xs font-medium text-gray-500">{k}</span>
+                          <div className="mt-1 rounded-lg border border-slate-200/90 bg-slate-50 px-3 py-2 text-sm text-slate-900">{v || '—'}</div>
+                        </div>
+                      ))}
                     </div>
-                    <div>
-                      <span className="text-sm font-medium text-gray-500">Date:</span>
-                      <p className="text-sm text-gray-900">{showTripModal.date}</p>
-                    </div>
-                    <div>
-                      <span className="text-sm font-medium text-gray-500">Vendor:</span>
-                      <p className="text-sm text-gray-900">{showTripModal.vendorName}</p>
-                    </div>
-                    <div>
-                      <span className="text-sm font-medium text-gray-500">Party:</span>
-                      <p className="text-sm text-gray-900">{showTripModal.partyName}</p>
-                    </div>
-                    <div>
-                      <span className="text-sm font-medium text-gray-500">From:</span>
-                      <p className="text-sm text-gray-900">{showTripModal.fromLocation}</p>
-                    </div>
-                    <div>
-                      <span className="text-sm font-medium text-gray-500">To:</span>
-                      <p className="text-sm text-gray-900">{showTripModal.toLocation}</p>
-                    </div>
-                    <div>
-                      <span className="text-sm font-medium text-gray-500">Vehicle:</span>
-                      <p className="text-sm text-gray-900">{showTripModal.vehicleNumber}</p>
-                    </div>
-                    <div>
-                      <span className="text-sm font-medium text-gray-500">GR/LR No:</span>
-                      <input
-                        type="text"
-                        defaultValue={showTripModal.grLrNo || ''}
-                        onBlur={(e) => {
-                          const nextValue = e.target.value.trim() || null;
-                          if ((showTripModal.grLrNo || null) === nextValue) return;
-                          updateLocalTripField('grLrNo', nextValue || undefined);
-                          saveTripInlineField(showTripModal, 'grLrNo', nextValue);
-                        }}
-                        className="mt-1 w-full px-2 py-1 border border-gray-300 rounded-sm text-sm"
-                        placeholder="Enter GR/LR No"
-                      />
-                      {savingField === `${showTripModal.id}:grLrNo` && (
-                        <p className="text-xs text-blue-600 mt-1">Saving...</p>
-                      )}
+                  </div>
+                  <div>
+                    <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Editable</p>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600">GR / LR no.</label>
+                        <input
+                          type="text"
+                          defaultValue={showTripModal.grLrNo || ''}
+                          onBlur={(e) => {
+                            const nextValue = e.target.value.trim() || null;
+                            if ((showTripModal.grLrNo || null) === nextValue) return;
+                            updateLocalTripField('grLrNo', nextValue || undefined);
+                            saveTripInlineField(showTripModal, 'grLrNo', nextValue);
+                          }}
+                          className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                          placeholder="Enter number"
+                        />
+                        {savingField === `${showTripModal.id}:grLrNo` && (
+                          <p className="mt-1 text-xs text-blue-600">Saving…</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600">GR received date</label>
+                        <input
+                          type="date"
+                          max={(() => {
+                            const t = todayInputMax();
+                            const p = calendarDay(showTripModal.podReceivedDate);
+                            if (!p) return t;
+                            return p < t ? p : t;
+                          })()}
+                          defaultValue={(showTripModal.grReceivedDate || '').split('T')[0]}
+                          onBlur={(e) => {
+                            const nextValue = e.target.value || null;
+                            const current = (showTripModal.grReceivedDate || '').split('T')[0] || null;
+                            if (current === nextValue) return;
+                            if (nextValue && isCalendarDateAfterToday(nextValue)) {
+                              toast.error('GR received date cannot be later than today');
+                              e.target.value = current || '';
+                              return;
+                            }
+                            const grDay = nextValue ? calendarDay(nextValue) : null;
+                            const podDay = calendarDay(showTripModal.podReceivedDate);
+                            if (grDay && podDay && grDay > podDay) {
+                              toast.error('GR received date cannot be after POD received date');
+                              e.target.value = current || '';
+                              return;
+                            }
+                            updateLocalTripField('grReceivedDate', nextValue || undefined);
+                            saveTripInlineField(showTripModal, 'grReceivedDate', nextValue);
+                          }}
+                          className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        />
+                        {savingField === `${showTripModal.id}:grReceivedDate` && (
+                          <p className="mt-1 text-xs text-blue-600">Saving…</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600">POD received date</label>
+                        <input
+                          type="date"
+                          min={calendarDay(showTripModal.grReceivedDate) || undefined}
+                          max={todayInputMax()}
+                          defaultValue={(showTripModal.podReceivedDate || '').split('T')[0]}
+                          onBlur={(e) => {
+                            const nextValue = e.target.value || null;
+                            const current = (showTripModal.podReceivedDate || '').split('T')[0] || null;
+                            if (current === nextValue) return;
+                            if (nextValue && isCalendarDateAfterToday(nextValue)) {
+                              toast.error('POD received date cannot be later than today');
+                              e.target.value = current || '';
+                              return;
+                            }
+                            const podDay = nextValue ? calendarDay(nextValue) : null;
+                            const grDay = calendarDay(showTripModal.grReceivedDate);
+                            if (podDay && grDay && isPodDateBeforeGrDate(podDay, grDay)) {
+                              toast.error('POD received date cannot be before GR received date');
+                              e.target.value = current || '';
+                              return;
+                            }
+                            updateLocalTripField('podReceivedDate', nextValue || undefined);
+                            saveTripInlineField(showTripModal, 'podReceivedDate', nextValue);
+                          }}
+                          className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        />
+                        {savingField === `${showTripModal.id}:podReceivedDate` && (
+                          <p className="mt-1 text-xs text-blue-600">Saving…</p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
+              </section>
 
-                {/* Financial Information */}
-                <div className="col-span-1 md:col-span-2 lg:col-span-3">
-                  <h4 className="font-semibold text-gray-900 mb-3 border-b pb-2">Financial Information</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {/* Financial */}
+              <section className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50/40 shadow-sm">
+                <div className="border-b border-gray-200 bg-white px-4 py-3">
+                  <h4 className="text-sm font-semibold text-gray-900">Financial</h4>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    Freight, bill date, branch, and e-way live on the trip; GR details sync charges from GR saves.
+                  </p>
+                </div>
+                <div className="space-y-5 p-4 sm:p-5">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <div>
-                      <span className="text-sm font-medium text-gray-500">Freight:</span>
+                      <label className="block text-xs font-medium text-gray-600">Freight</label>
                       <input
                         type="number"
                         step="0.01"
@@ -508,15 +759,15 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                           updateLocalTripField('freight', nextValue ?? undefined);
                           saveTripInlineField(showTripModal, 'freight', nextValue);
                         }}
-                        className="mt-1 w-full px-2 py-1 border border-gray-300 rounded-sm text-sm"
+                        className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm tabular-nums shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                         placeholder="0.00"
                       />
                       {savingField === `${showTripModal.id}:freight` && (
-                        <p className="text-xs text-blue-600 mt-1">Saving...</p>
+                        <p className="mt-1 text-xs text-blue-600">Saving…</p>
                       )}
                     </div>
                     <div>
-                      <span className="text-sm font-medium text-gray-500">Advance:</span>
+                      <label className="block text-xs font-medium text-gray-600">Advance</label>
                       <input
                         type="number"
                         step="0.01"
@@ -528,15 +779,15 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                           updateLocalTripField('advance', nextValue ?? undefined);
                           saveTripInlineField(showTripModal, 'advance', nextValue);
                         }}
-                        className={`mt-1 w-full px-2 py-1 border rounded-sm text-sm ${(needsAdvanceAlert(showTripModal) || needsPaymentPendingAlert(showTripModal)) ? 'border-red-400 text-red-700' : 'border-gray-300'}`}
+                        className={`mt-1.5 w-full rounded-lg border bg-white px-3 py-2 text-sm tabular-nums shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${(needsAdvanceAlert(showTripModal) || needsPaymentPendingAlert(showTripModal)) ? 'border-red-300 text-red-800 focus:border-red-500' : 'border-gray-300 focus:border-blue-500'}`}
                         placeholder="0.00"
                       />
                       {savingField === `${showTripModal.id}:advance` && (
-                        <p className="text-xs text-blue-600 mt-1">Saving...</p>
+                        <p className="mt-1 text-xs text-blue-600">Saving…</p>
                       )}
                     </div>
                     <div>
-                      <span className="text-sm font-medium text-gray-500">Toll:</span>
+                      <label className="block text-xs font-medium text-gray-600">Toll</label>
                       <input
                         type="number"
                         step="0.01"
@@ -548,15 +799,15 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                           updateLocalTripField('tollExpense', nextValue ?? undefined);
                           saveTripInlineField(showTripModal, 'tollExpense', nextValue);
                         }}
-                        className="mt-1 w-full px-2 py-1 border border-gray-300 rounded-sm text-sm"
+                        className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm tabular-nums shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                         placeholder="0.00"
                       />
                       {savingField === `${showTripModal.id}:tollExpense` && (
-                        <p className="text-xs text-blue-600 mt-1">Saving...</p>
+                        <p className="mt-1 text-xs text-blue-600">Saving…</p>
                       )}
                     </div>
                     <div>
-                      <span className="text-sm font-medium text-gray-500">Initial:</span>
+                      <label className="block text-xs font-medium text-gray-600">Initial</label>
                       <input
                         type="number"
                         step="0.01"
@@ -568,41 +819,15 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                           updateLocalTripField('initialExpense', nextValue ?? undefined);
                           saveTripInlineField(showTripModal, 'initialExpense', nextValue);
                         }}
-                        className="mt-1 w-full px-2 py-1 border border-gray-300 rounded-sm text-sm"
+                        className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm tabular-nums shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                         placeholder="0.00"
                       />
                       {savingField === `${showTripModal.id}:initialExpense` && (
-                        <p className="text-xs text-blue-600 mt-1">Saving...</p>
+                        <p className="mt-1 text-xs text-blue-600">Saving…</p>
                       )}
                     </div>
                     <div>
-                      <span className="text-sm font-medium text-gray-500">Total Expense:</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        defaultValue={showTripModal.totalExpense ?? ''}
-                        onBlur={(e) => {
-                          const nextValue = parseNumberInput(e.target.value);
-                          const currentValue = showTripModal.totalExpense ?? null;
-                          if (currentValue === nextValue) return;
-                          updateLocalTripField('totalExpense', nextValue ?? undefined);
-                          saveTripInlineField(showTripModal, 'totalExpense', nextValue);
-                        }}
-                        className="mt-1 w-full px-2 py-1 border border-gray-300 rounded-sm text-sm"
-                        placeholder="0.00"
-                      />
-                      {savingField === `${showTripModal.id}:totalExpense` && (
-                        <p className="text-xs text-blue-600 mt-1">Saving...</p>
-                      )}
-                    </div>
-                    <div>
-                      <span className="text-sm font-medium text-gray-500">P&L:</span>
-                      <p className={`text-sm font-medium ${getProfitLossColor(showTripModal.profitLoss)}`}>
-                        {formatCurrency(showTripModal.profitLoss)}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-sm font-medium text-gray-500">Bill No:</span>
+                      <label className="block text-xs font-medium text-gray-600">Party bill no.</label>
                       <input
                         type="text"
                         defaultValue={showTripModal.billNo || ''}
@@ -612,15 +837,15 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                           updateLocalTripField('billNo', nextValue || undefined);
                           saveTripInlineField(showTripModal, 'billNo', nextValue);
                         }}
-                        className="mt-1 w-full px-2 py-1 border border-gray-300 rounded-sm text-sm"
-                        placeholder="Enter bill number"
+                        className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        placeholder="Enter party bill no."
                       />
                       {savingField === `${showTripModal.id}:billNo` && (
-                        <p className="text-xs text-blue-600 mt-1">Saving...</p>
+                        <p className="mt-1 text-xs text-blue-600">Saving…</p>
                       )}
                     </div>
                     <div>
-                      <span className="text-sm font-medium text-gray-500">Bill Date:</span>
+                      <label className="block text-xs font-medium text-gray-600">Bill date</label>
                       <input
                         type="date"
                         defaultValue={(showTripModal.billDate || '').split('T')[0]}
@@ -631,99 +856,204 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
                           updateLocalTripField('billDate', nextValue || undefined);
                           saveTripInlineField(showTripModal, 'billDate', nextValue);
                         }}
-                        className="mt-1 w-full px-2 py-1 border border-gray-300 rounded-sm text-sm"
+                        className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                       />
                       {savingField === `${showTripModal.id}:billDate` && (
-                        <p className="text-xs text-blue-600 mt-1">Saving...</p>
+                        <p className="mt-1 text-xs text-blue-600">Saving…</p>
+                      )}
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-medium text-gray-600">Branch</label>
+                      <p className="mt-0.5 text-[11px] text-gray-500">
+                        {effectivePartyId
+                          ? 'Billing branch for this party (ledger name on invoices).'
+                          : 'Free-text branch name when the trip is not linked to a party master.'}
+                      </p>
+                      {awaitingPartyResolve && !effectivePartyId ? (
+                        <p className="mt-1.5 text-xs text-gray-500">Loading party branches…</p>
+                      ) : effectivePartyId ? (
+                        partyBranchOptions.length > 0 ? (
+                          <>
+                            <select
+                              className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                              value={showTripModal.partyBranchId ?? ''}
+                              onChange={(e) => {
+                                const next = e.target.value.trim() || null;
+                                updateLocalTripField('partyBranchId', next ?? undefined);
+                                saveTripInlineField(showTripModal, 'partyBranchId', next);
+                              }}
+                            >
+                              <option value="">— Select branch —</option>
+                              {partyBranchOptions.map((b) => (
+                                <option key={b.id} value={b.id} disabled={!b.isActive}>
+                                  {b.locationLabel ? `${b.locationLabel} — ` : ''}
+                                  {b.fullLedgerName}
+                                  {!b.isActive ? ' (inactive)' : ''}
+                                </option>
+                              ))}
+                            </select>
+                            {savingField === `${showTripModal.id}:partyBranchId` && (
+                              <p className="mt-1 text-xs text-blue-600">Saving…</p>
+                            )}
+                          </>
+                        ) : (
+                          <p className="mt-1.5 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
+                            No branches for this party yet. Open{' '}
+                            <span className="font-medium">Parties</span>, choose the party, and use{' '}
+                            <span className="font-medium">Add branch</span> under Billing branches.
+                          </p>
+                        )
+                      ) : canShowFreeTextBranch ? (
+                        <>
+                          <input
+                            type="text"
+                            defaultValue={showTripModal.branchName || ''}
+                            onBlur={(e) => {
+                              const nextValue = e.target.value.trim() || null;
+                              if ((showTripModal.branchName || null) === nextValue) return;
+                              updateLocalTripField('branchName', nextValue || undefined);
+                              saveTripInlineField(showTripModal, 'branchName', nextValue);
+                            }}
+                            className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                            placeholder="Branch"
+                          />
+                          {savingField === `${showTripModal.id}:branchName` && (
+                            <p className="mt-1 text-xs text-blue-600">Saving…</p>
+                          )}
+                        </>
+                      ) : null}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600">E-way date</label>
+                      <input
+                        type="date"
+                        defaultValue={(showTripModal.ewayDate || '').split('T')[0]}
+                        onBlur={(e) => {
+                          const nextValue = e.target.value || null;
+                          const cur = (showTripModal.ewayDate || '').split('T')[0] || null;
+                          if (cur === nextValue) return;
+                          updateLocalTripField('ewayDate', nextValue || undefined);
+                          saveTripInlineField(showTripModal, 'ewayDate', nextValue);
+                        }}
+                        className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      />
+                      {savingField === `${showTripModal.id}:ewayDate` && (
+                        <p className="mt-1 text-xs text-blue-600">Saving…</p>
                       )}
                     </div>
                   </div>
-                </div>
 
-                {/* Status */}
-                <div className="col-span-1 md:col-span-2 lg:col-span-3">
-                  <h4 className="font-semibold text-gray-900 mb-3 border-b pb-2">Status & Actions</h4>
-                  <div className="flex items-center gap-4 mb-4">
-                    <div>
-                      <span className="text-sm font-medium text-gray-500">Current Status:</span>
-                      <div className="mt-1">
-                        {updatingStatus === showTripModal.id ? (
-                          <div className="flex items-center">
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                            <span className="text-xs text-gray-500">Updating...</span>
+                  <div className="rounded-lg border border-violet-200/90 bg-violet-50/50 p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-violet-900/90">From goods receipt</p>
+                    <p className="mt-1 text-xs text-violet-800/75">
+                      Labour, other charges, and detention fields match the GR. Re-save <span className="font-medium">GR details</span> to sync.
+                    </p>
+                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      {(
+                        [
+                          ['Labour charges', showTripModal.labourCharges],
+                          ['Other charges', showTripModal.otherCharges],
+                          ['Detention loading', showTripModal.detentionLoading],
+                          ['Detention U/L', showTripModal.detentionUL],
+                        ] as const
+                      ).map(([label, val]) => (
+                        <div key={label}>
+                          <span className="block text-xs font-medium text-violet-900/70">{label}</span>
+                          <div className="mt-1.5 rounded-lg border border-violet-200/80 bg-white px-3 py-2 text-sm tabular-nums text-slate-900">
+                            {formatCurrency(val ?? 0)}
                           </div>
-                        ) : (
-                          <select
-                            value={showTripModal.status}
-                            onChange={(e) => {
-                              handleStatusChange(showTripModal.id, e.target.value);
-                              setShowTripModal({...showTripModal, status: e.target.value});
-                            }}
-                            className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full border-0 cursor-pointer focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 ${getStatusColor(showTripModal.status)}`}
-                            disabled={updatingStatus !== null}
-                          >
-                            <option value="PENDING">Pending</option>
-                            <option value="IN_PROGRESS">In Transit</option>
-                            <option value="COMPLETED">Completed</option>
-                            <option value="INVOICING">Invoicing</option>
-                            <option value="CANCELLED">Cancelled</option>
-                          </select>
-                        )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-slate-100/80 p-4 sm:grid-cols-2">
+                    <div className="rounded-lg border border-slate-200/80 bg-white/90 p-4 shadow-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total expense</span>
+                        <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-medium uppercase text-slate-500">Calculated</span>
                       </div>
+                      <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-slate-900">
+                        {formatCurrency(tripExpenseTotal(showTripModal))}
+                      </p>
+                      <p className="mt-2 text-xs leading-relaxed text-slate-500">
+                        Initial + toll + labour + other charges + detention loading + detention U/L. GR fields sync on save; toll and initial can be edited above.
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200/80 bg-white/90 p-4 shadow-sm">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">P&amp;L</span>
+                      <p className={`mt-2 text-2xl font-semibold tabular-nums tracking-tight ${getProfitLossColor(showTripModal.profitLoss)}`}>
+                        {formatCurrency(showTripModal.profitLoss)}
+                      </p>
+                      <p className="mt-2 text-xs text-slate-500">Freight minus total expense (from server).</p>
                     </div>
                   </div>
                 </div>
+              </section>
 
-                {/* Actions */}
-                <div className="col-span-1 md:col-span-2 lg:col-span-3">
-                  <h4 className="font-semibold text-gray-900 mb-3 border-b pb-2">Actions</h4>
-                  <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3">
-                    <button
-                      onClick={() => {
-                        handleOperationsUpdate(showTripModal);
-                        setShowTripModal(null);
-                      }}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-sm hover:bg-blue-700 transition-colors text-sm font-medium w-full sm:w-auto"
-                    >
-                      Update Operations
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleAccountsUpdate(showTripModal);
-                        setShowTripModal(null);
-                      }}
-                      className="bg-green-600 text-white px-4 py-2 rounded-sm hover:bg-green-700 transition-colors text-sm font-medium w-full sm:w-auto"
-                    >
-                      Update Accounts
-                    </button>
-                    <button
-                      onClick={() => {
-                        toggleExpand(showTripModal);
-                      }}
-                      className="bg-purple-600 text-white px-4 py-2 rounded-sm hover:bg-purple-700 transition-colors text-sm font-medium w-full sm:w-auto"
-                    >
-                      View GR Details
-                    </button>
+              {/* Status + actions */}
+              <section className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50/40 shadow-sm">
+                <div className="flex flex-col gap-4 border-b border-gray-200 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-900">Status</h4>
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      POD pending → Invoicing (POD received) → Payment pending (invoice) → Completed (money receipt).
+                      You can only cancel a trip here.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {updatingStatus === showTripModal.id ? (
+                      <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                        <span className="text-sm text-gray-600">Updating…</span>
+                      </div>
+                    ) : (
+                      <>
+                        <span
+                          className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${getStatusColor(showTripModal.status)}`}
+                        >
+                          {getStatusDisplay(showTripModal.status)}
+                        </span>
+                        {showTripModal.status !== 'CANCELLED' && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="text-red-700 border-red-200 hover:bg-red-50"
+                            disabled={updatingStatus !== null}
+                            onClick={() => handleCancelTrip(showTripModal.id)}
+                          >
+                            Cancel trip
+                          </Button>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
+                <div className="flex flex-col-reverse gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand(showTripModal)}
+                    className="inline-flex w-full items-center justify-center rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-violet-700 sm:w-auto"
+                  >
+                    View GR details
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowTripModal(null)}
+                    className="inline-flex w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 sm:w-auto"
+                  >
+                    Close
+                  </button>
+                </div>
+              </section>
 
-                {/* Remarks */}
-                {showTripModal.remarks && (
-                  <div className="col-span-1 md:col-span-2 lg:col-span-3">
-                    <h4 className="font-semibold text-gray-900 mb-3 border-b pb-2">Remarks</h4>
-                    <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-sm">{showTripModal.remarks}</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex justify-end">
-                <button
-                  onClick={() => setShowTripModal(null)}
-                  className="bg-gray-500 text-white px-4 py-2 rounded-sm hover:bg-gray-600 transition-colors text-sm font-medium"
-                >
-                  Close
-                </button>
-              </div>
+              {showTripModal.remarks && (
+                <section className="rounded-xl border border-amber-200/80 bg-amber-50/50 p-4 sm:p-5">
+                  <h4 className="text-sm font-semibold text-amber-900">Remarks</h4>
+                  <p className="mt-2 text-sm leading-relaxed text-amber-950/90">{showTripModal.remarks}</p>
+                </section>
+              )}
             </div>
           </div>
         </div>
@@ -736,37 +1066,6 @@ export function AdminTripTable({ trips, onRefresh }: AdminTripTableProps) {
           grData={grData[showGRModal.tripNo] || []}
           onClose={() => setShowGRModal(null)}
           onRefresh={onRefresh}
-        />
-      )}
-
-      {/* Operations Update Modal */}
-      {showOperationsModal && (
-        <OperationsUpdateModal
-          tripId={showOperationsModal.id}
-          tripNo={showOperationsModal.tripNo}
-          currentData={{
-            grLrNo: showOperationsModal.grLrNo,
-            tollExpense: showOperationsModal.tollExpense,
-          }}
-          onSave={handleUpdateComplete}
-          onCancel={handleModalCancel}
-          onBack={() => handleBackToTripDetails(showOperationsModal)}
-        />
-      )}
-
-      {/* Accounts Update Modal */}
-      {showAccountsModal && (
-        <AccountsUpdateModal
-          tripId={showAccountsModal.id}
-          tripNo={showAccountsModal.tripNo}
-          currentData={{
-            freight: showAccountsModal.freight,
-            billNo: showAccountsModal.billNo,
-            billDate: showAccountsModal.billDate,
-          }}
-          onSave={handleUpdateComplete}
-          onCancel={handleModalCancel}
-          onBack={() => handleBackToTripDetails(showAccountsModal)}
         />
       )}
     </div>

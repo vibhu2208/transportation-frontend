@@ -16,15 +16,14 @@ const grSchema = z.object({
   fromStation: z.string().optional(),
   toStation: z.string().optional(),
   truckLorryNo: z.string().optional(),
-  freight: z.string().optional(),
   package: z.string().optional(),
   detentionLoading: z.string().optional(),
   detentionUL: z.string().optional(),
   toll: z.string().optional(),
   labourCharges: z.string().optional(),
   otherCharges: z.string().optional(),
-  ewayDate: z.string().optional(),
   branchName: z.string().optional(),
+  ewayDate: z.string().optional(),
   billedAtBranch: z.string().optional(),
   cnType: z.string().optional(),
   deliveryAt: z.string().optional(),
@@ -35,7 +34,6 @@ const grSchema = z.object({
   consigneeName: z.string().optional(),
   partySlab: z.string().optional(),
   distanceKm: z.string().optional(),
-  partyBillDate: z.string().optional(),
   netInvValue: z.string().optional(),
   agentTruck: z.string().optional(),
   capacity: z.string().optional(),
@@ -47,25 +45,7 @@ const grSchema = z.object({
   actualWt: z.string().optional(),
   chargedWt: z.string().optional(),
   unit: z.string().optional(),
-  loadingChg: z.string().optional(),
-  unloadingChg: z.string().optional(),
-  pMarkaAwbGr: z.string().optional(),
   gstPaidBy: z.string().optional(),
-  account: z.string().optional(),
-  basicFreight: z.string().optional(),
-  totalFreight: z.string().optional(),
-  gst: z.string().optional(),
-  advanceDate: z.string().optional(),
-  netPayable: z.string().optional(),
-  fromStationUp: z.string().optional(),
-  toStationUp: z.string().optional(),
-  driverName: z.string().optional(),
-  poNo: z.string().optional(),
-  shipmentId: z.string().optional(),
-  grPhotoUrl: z.string().optional(),
-}).transform((data) => {
-  console.log('Form validation data:', data);
-  return data;
 });
 
 type GRData = z.infer<typeof grSchema>;
@@ -78,7 +58,7 @@ interface GREditModalProps {
   onBack?: () => void;
 }
 
-const DATE_FIELDS: (keyof GRData)[] = ['cnDate', 'partyBillDate', 'advanceDate', 'ewayDate'];
+const DATE_FIELDS: (keyof GRData)[] = ['cnDate', 'ewayDate'];
 
 const toInputDateValue = (value: unknown): string => {
   if (!value || typeof value !== 'string') return '';
@@ -89,7 +69,28 @@ const toInputDateValue = (value: unknown): string => {
   return parsed.toISOString().split('T')[0];
 };
 
+const formatTripMoney = (n: unknown) => {
+  if (n === null || n === undefined || n === '') return '—';
+  const num = typeof n === 'number' ? n : Number(n);
+  if (Number.isNaN(num)) return '—';
+  return `₹${num.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+};
+
+const formatTripBillDate = (iso: string | null | undefined) => {
+  if (!iso) return '—';
+  const d = iso.split('T')[0];
+  if (!d) return '—';
+  const [y, m, day] = d.split('-');
+  if (!y || !m || !day) return '—';
+  return `${day}/${m}/${y}`;
+};
+
 const normalizeDefaultValues = (existingGR: any, trip: any): Partial<GRData> => {
+  const branchEway: Partial<GRData> = {
+    branchName: trip.branchName ?? '',
+    ewayDate: toInputDateValue(trip.ewayDate),
+  };
+
   if (!existingGR) {
     return {
       cnNo: trip.tripNo,
@@ -100,6 +101,7 @@ const normalizeDefaultValues = (existingGR: any, trip: any): Partial<GRData> => 
       fromStation: trip.fromLocation,
       toStation: trip.toLocation,
       gstPaidBy: 'Consignor',
+      ...branchEway,
     };
   }
 
@@ -112,14 +114,17 @@ const normalizeDefaultValues = (existingGR: any, trip: any): Partial<GRData> => 
     normalized[field] = toInputDateValue(normalized[field]);
   });
 
-  return normalized as Partial<GRData>;
+  return {
+    ...(normalized as Partial<GRData>),
+    ...branchEway,
+  };
 };
 
 export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREditModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [grBiltyImages, setGrBiltyImages] = useState<string[]>(existingGR?.grBiltyImages || []);
   const isEditing = !!existingGR;
-  
+
   const {
     register,
     handleSubmit,
@@ -133,19 +138,18 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
     setIsLoading(true);
     try {
       const token = localStorage.getItem('auth_token');
-      
+
       if (!token) {
         toast.error('Authentication required. Please login again.');
         return;
       }
-      
+
       const headers = { Authorization: `Bearer ${token}` };
 
-      // Get user info from token to determine shipperId
       let shipperId = null;
       try {
         const tokenPayload = JSON.parse(atob(token.split('.')[1]));
-        shipperId = tokenPayload.sub; // This should be the user ID
+        shipperId = tokenPayload.sub;
       } catch (e) {
         console.error('Error parsing token:', e);
         toast.error('Invalid authentication token. Please login again.');
@@ -159,7 +163,6 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
         shipperId: shipperId,
       };
 
-      // Remove internal fields that shouldn't be sent back to the server
       if (isEditing) {
         delete (submitData as any).id;
         delete (submitData as any).createdAt;
@@ -175,25 +178,21 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
           acc[key] = value;
           return acc;
         },
-        {}
+        {},
       );
 
       if (isEditing) {
         await axios.patch(
           `${process.env.NEXT_PUBLIC_API_URL}/goods-receipt/${existingGR.id}`,
           cleanedSubmitData,
-          { headers }
+          { headers },
         );
         toast.success('GR details updated successfully!');
       } else {
-        await axios.post(
-          `${process.env.NEXT_PUBLIC_API_URL}/goods-receipt`,
-          cleanedSubmitData,
-          { headers }
-        );
+        await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/goods-receipt`, cleanedSubmitData, { headers });
         toast.success('GR details added successfully!');
       }
-      
+
       onSave();
     } catch (error: any) {
       console.error('GR save error:', error);
@@ -225,30 +224,55 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
                   {isEditing ? 'Edit GR Details' : 'Add GR Details'} - Trip {trip.tripNo}
                 </h3>
                 <p className="text-sm text-gray-500">
-                  {isEditing ? 'Update goods receipt information' : 'Enter goods receipt information'}
+                  Freight and bill date are stored on the trip; branch and e-way update the trip when you save.
                 </p>
               </div>
             </div>
-            <button
-              onClick={onCancel}
-              className="text-gray-400 hover:text-gray-500 shrink-0 p-1"
-            >
+            <button onClick={onCancel} className="text-gray-400 hover:text-gray-500 shrink-0 p-1">
               <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
 
-          <form
-            onSubmit={handleSubmit(onSubmit)}
-            className="space-y-6"
-          >
-            {/* Essential Invoice Fields */}
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <section className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
-              <h3 className="text-lg font-bold text-blue-900 border-b border-blue-200 pb-2 flex items-center gap-2">
-                Essential Invoice Fields
-              </h3>
+              <h3 className="text-lg font-bold text-blue-900 border-b border-blue-200 pb-2">Essential fields</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Branch</label>
+                  <Input
+                    {...register('branchName')}
+                    error={errors.branchName?.message}
+                    className="border-blue-300 focus:ring-blue-500"
+                    placeholder="Branch"
+                  />
+                  <p className="mt-1 text-xs text-blue-800/80">Saved on the trip (single source).</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">E-way date</label>
+                  <Input
+                    type="date"
+                    {...register('ewayDate')}
+                    error={errors.ewayDate?.message}
+                    className="border-blue-300 focus:ring-blue-500"
+                  />
+                  <p className="mt-1 text-xs text-blue-800/80">Saved on the trip.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Freight (from trip)</label>
+                  <div className="rounded-md border border-blue-200 bg-white px-3 py-2 text-sm text-gray-900">
+                    {formatTripMoney(trip.freight)}
+                  </div>
+                  <p className="mt-1 text-xs text-blue-800/80">Edit under Trip details → Financial.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Bill date (from trip)</label>
+                  <div className="rounded-md border border-blue-200 bg-white px-3 py-2 text-sm text-gray-900">
+                    {formatTripBillDate(trip.billDate)}
+                  </div>
+                  <p className="mt-1 text-xs text-blue-800/80">Same as party bill date; edit on Trip details.</p>
+                </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">GR No.</label>
                   <Input
@@ -288,14 +312,6 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
                   <Input
                     {...register('truckLorryNo')}
                     error={errors.truckLorryNo?.message}
-                    className="border-blue-300 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Freight</label>
-                  <Input
-                    {...register('freight')}
-                    error={errors.freight?.message}
                     className="border-blue-300 focus:ring-blue-500"
                   />
                 </div>
@@ -352,94 +368,84 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
               </div>
             </section>
 
-            {/* Party / Consignor Details */}
             <section className="space-y-4">
-              <h3 className="text-lg font-semibold border-b pb-2">Party / Consignor Details</h3>
+              <h3 className="text-lg font-semibold border-b pb-2">Consignment</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Billed At Branch</label>
+                  <Input {...register('billedAtBranch')} error={errors.billedAtBranch?.message} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">CN Type</label>
+                  <Input {...register('cnType')} error={errors.cnType?.message} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Delivery At</label>
+                  <Input {...register('deliveryAt')} error={errors.deliveryAt?.message} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">CN No</label>
+                  <Input {...register('cnNo')} error={errors.cnNo?.message} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
+                  <Input {...register('cnTime')} error={errors.cnTime?.message} />
+                </div>
+              </div>
+            </section>
+
+            <section className="space-y-4">
+              <h3 className="text-lg font-semibold border-b pb-2">Party / Consignor</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Consignor</label>
-                  <Input
-                    {...register('consignor')}
-                    error={errors.consignor?.message}
-                  />
+                  <Input {...register('consignor')} error={errors.consignor?.message} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Charged Party</label>
-                  <Input
-                    {...register('chargedParty')}
-                    error={errors.chargedParty?.message}
-                  />
+                  <Input {...register('chargedParty')} error={errors.chargedParty?.message} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Consignee Name</label>
-                  <Input
-                    {...register('consigneeName')}
-                    error={errors.consigneeName?.message}
-                  />
+                  <Input {...register('consigneeName')} error={errors.consigneeName?.message} />
                 </div>
               </div>
             </section>
 
-            {/* Transport Route Details */}
             <section className="space-y-4">
-              <h3 className="text-lg font-semibold border-b pb-2">Transport Route Details</h3>
+              <h3 className="text-lg font-semibold border-b pb-2">Transport route</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Party Slab</label>
-                  <Input
-                    {...register('partySlab')}
-                    error={errors.partySlab?.message}
-                  />
+                  <Input {...register('partySlab')} error={errors.partySlab?.message} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Distance/Km</label>
-                  <Input
-                    {...register('distanceKm')}
-                    error={errors.distanceKm?.message}
-                  />
+                  <Input {...register('distanceKm')} error={errors.distanceKm?.message} />
                 </div>
               </div>
             </section>
 
-            {/* Invoice / Billing Details */}
             <section className="space-y-4">
-              <h3 className="text-lg font-semibold border-b pb-2">Invoice / Billing Details</h3>
+              <h3 className="text-lg font-semibold border-b pb-2">Invoice</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Party Bill Date</label>
-                  <Input
-                    type="date"
-                    {...register('partyBillDate')}
-                    error={errors.partyBillDate?.message}
-                  />
-                </div>
-                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Net Inv. Value</label>
-                  <Input
-                    {...register('netInvValue')}
-                    error={errors.netInvValue?.message}
-                  />
+                  <Input {...register('netInvValue')} error={errors.netInvValue?.message} />
                 </div>
               </div>
             </section>
 
-            {/* Vehicle / Transport Details */}
             <section className="space-y-4">
-              <h3 className="text-lg font-semibold border-b pb-2">Vehicle / Transport Details</h3>
+              <h3 className="text-lg font-semibold border-b pb-2">Vehicle / transport</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Agent Truck</label>
-                  <Input
-                    {...register('agentTruck')}
-                    error={errors.agentTruck?.message}
-                  />
+                  <Input {...register('agentTruck')} error={errors.agentTruck?.message} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Capacity</label>
-                  <Input
-                    {...register('capacity')}
-                    error={errors.capacity?.message}
-                  />
+                  <Input {...register('capacity')} error={errors.capacity?.message} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
@@ -451,24 +457,17 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Comm</label>
-                  <Input
-                    {...register('comm')}
-                    error={errors.comm?.message}
-                  />
+                  <Input {...register('comm')} error={errors.comm?.message} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Rate</label>
-                  <Input
-                    {...register('rate')}
-                    error={errors.rate?.message}
-                  />
+                  <Input {...register('rate')} error={errors.rate?.message} />
                 </div>
               </div>
             </section>
 
-            {/* Package / Goods Details */}
             <section className="space-y-4">
-              <h3 className="text-lg font-semibold border-b pb-2">Package / Goods Details</h3>
+              <h3 className="text-lg font-semibold border-b pb-2">Package / goods</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Type of Pkg</label>
@@ -480,72 +479,28 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Goods Description</label>
-                  <Input
-                    {...register('goodsDescription')}
-                    error={errors.goodsDescription?.message}
-                  />
+                  <Input {...register('goodsDescription')} error={errors.goodsDescription?.message} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Actual WT</label>
-                  <Input
-                    {...register('actualWt')}
-                    error={errors.actualWt?.message}
-                  />
+                  <Input {...register('actualWt')} error={errors.actualWt?.message} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Charged WT</label>
-                  <Input
-                    {...register('chargedWt')}
-                    error={errors.chargedWt?.message}
-                  />
+                  <Input {...register('chargedWt')} error={errors.chargedWt?.message} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-                  <Input
-                    {...register('unit')}
-                    error={errors.unit?.message}
-                  />
+                  <Input {...register('unit')} error={errors.unit?.message} />
                 </div>
               </div>
             </section>
 
-            {/* Charges Section */}
             <section className="space-y-4">
-              <h3 className="text-lg font-semibold border-b pb-2">Charges Section</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Loading Chg</label>
-                  <Input
-                    {...register('loadingChg')}
-                    error={errors.loadingChg?.message}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">UnLoading Chg</label>
-                  <Input
-                    {...register('unloadingChg')}
-                    error={errors.unloadingChg?.message}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">P. Marka / AWB / GR</label>
-                  <Input
-                    {...register('pMarkaAwbGr')}
-                    error={errors.pMarkaAwbGr?.message}
-                  />
-                </div>
-              </div>
-            </section>
-
-            {/* GST Details */}
-            <section className="space-y-4">
-              <h3 className="text-lg font-semibold border-b pb-2">GST Details</h3>
+              <h3 className="text-lg font-semibold border-b pb-2">GST</h3>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">GST Paid By</label>
-                <select
-                  {...register('gstPaidBy')}
-                  className="w-full px-3 py-2 border rounded-md border-gray-300"
-                >
+                <select {...register('gstPaidBy')} className="w-full px-3 py-2 border rounded-md border-gray-300">
                   <option value="">Select...</option>
                   <option value="Consignor">Consignor</option>
                   <option value="Consignee">Consignee</option>
@@ -558,115 +513,6 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
               </div>
             </section>
 
-            {/* Accounts / Payment */}
-            <section className="space-y-4">
-              <h3 className="text-lg font-semibold border-b pb-2">Accounts / Payment</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">A/C</label>
-                  <Input
-                    {...register('account')}
-                    error={errors.account?.message}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Basic Freight</label>
-                  <Input
-                    {...register('basicFreight')}
-                    error={errors.basicFreight?.message}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Total Freight</label>
-                  <Input
-                    {...register('totalFreight')}
-                    error={errors.totalFreight?.message}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">GST</label>
-                  <Input
-                    {...register('gst')}
-                    error={errors.gst?.message}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Advance Date</label>
-                  <Input
-                    type="date"
-                    {...register('advanceDate')}
-                    error={errors.advanceDate?.message}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">EWAY Date</label>
-                  <Input
-                    type="date"
-                    {...register('ewayDate')}
-                    error={errors.ewayDate?.message}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Net Payable</label>
-                  <Input
-                    {...register('netPayable')}
-                    error={errors.netPayable?.message}
-                  />
-                </div>
-              </div>
-            </section>
-
-            {/* Additional Fields */}
-            <section className="space-y-4">
-              <h3 className="text-lg font-semibold border-b pb-2">Additional Fields</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">From Station UP</label>
-                  <Input
-                    {...register('fromStationUp')}
-                    error={errors.fromStationUp?.message}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">To Station UP</label>
-                  <Input
-                    {...register('toStationUp')}
-                    error={errors.toStationUp?.message}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Driver Name</label>
-                  <Input
-                    {...register('driverName')}
-                    error={errors.driverName?.message}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">PO No.</label>
-                  <Input
-                    {...register('poNo')}
-                    error={errors.poNo?.message}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Shipment ID</label>
-                  <Input
-                    {...register('shipmentId')}
-                    error={errors.shipmentId?.message}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">GR Photo URL</label>
-                  <Input
-                    {...register('grPhotoUrl')}
-                    error={errors.grPhotoUrl?.message}
-                    placeholder="Upload photo and paste URL"
-                  />
-                </div>
-              </div>
-            </section>
-
-            {/* GR/Bilty Images Section */}
             <section className="space-y-4">
               <h3 className="text-lg font-semibold border-b pb-2">GR/Bilty Images</h3>
               <ImageUpload
@@ -682,7 +528,7 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
                 Cancel
               </Button>
               <Button type="submit" disabled={isLoading}>
-                {isLoading ? 'Saving...' : (isEditing ? 'Update GR' : 'Add GR')}
+                {isLoading ? 'Saving...' : isEditing ? 'Update GR' : 'Add GR'}
               </Button>
             </div>
           </form>

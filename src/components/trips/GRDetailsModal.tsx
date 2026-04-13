@@ -169,7 +169,15 @@ export function GRDetailsModal({ trip, grData, onClose, onRefresh }: GRDetailsMo
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
                     <div>
                       <span className="font-medium text-gray-600">Branch:</span>
-                      <p className="text-gray-900">{gr.branchName}</p>
+                      <p className="text-gray-900">{trip.branchName || '—'}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600">E-way date:</span>
+                      <p className="text-gray-900">
+                        {trip.ewayDate
+                          ? new Date(trip.ewayDate).toLocaleDateString('en-IN')
+                          : '—'}
+                      </p>
                     </div>
                     <div>
                       <span className="font-medium text-gray-600">CN No:</span>
@@ -200,8 +208,20 @@ export function GRDetailsModal({ trip, grData, onClose, onRefresh }: GRDetailsMo
                       <p className="text-gray-900">{gr.goodsDescription}</p>
                     </div>
                     <div>
-                      <span className="font-medium text-gray-600">Freight:</span>
-                      <p className="text-gray-900">₹{gr.freight || '-'}</p>
+                      <span className="font-medium text-gray-600">Freight (trip):</span>
+                      <p className="text-gray-900">
+                        {trip.freight != null && trip.freight !== undefined
+                          ? `₹${Number(trip.freight).toLocaleString('en-IN')}`
+                          : '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600">Bill date (trip):</span>
+                      <p className="text-gray-900">
+                        {trip.billDate
+                          ? new Date(trip.billDate).toLocaleDateString('en-IN')
+                          : '—'}
+                      </p>
                     </div>
                     {gr.toll && normalizeAmount(gr.toll) > 0 && (
                       <div>
@@ -209,22 +229,6 @@ export function GRDetailsModal({ trip, grData, onClose, onRefresh }: GRDetailsMo
                         <p className="text-gray-900">₹{gr.toll}</p>
                       </div>
                     )}
-                    {gr.totalFreight &&
-                      normalizeAmount(gr.totalFreight) > 0 &&
-                      normalizeAmount(gr.totalFreight) !== normalizeAmount(gr.freight) && (
-                        <div>
-                          <span className="font-medium text-gray-600">Total Freight:</span>
-                          <p className="text-gray-900">₹{gr.totalFreight}</p>
-                        </div>
-                      )}
-                    <div>
-                      <span className="font-medium text-gray-600">GST:</span>
-                      <p className="text-gray-900">₹{gr.gst || '-'}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-600">Net Payable:</span>
-                      <p className="text-gray-900 font-semibold">₹{gr.netPayable || '-'}</p>
-                    </div>
                     <div>
                       <span className="font-medium text-gray-600">Actual WT:</span>
                       <p className="text-gray-900">{gr.actualWt} {gr.unit}</p>
@@ -236,10 +240,6 @@ export function GRDetailsModal({ trip, grData, onClose, onRefresh }: GRDetailsMo
                     <div>
                       <span className="font-medium text-gray-600">GST Paid By:</span>
                       <p className="text-gray-900">{gr.gstPaidBy}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-600">Shipment ID:</span>
-                      <p className="text-gray-900">{gr.shipmentId || '-'}</p>
                     </div>
                     <div>
                       <span className="font-medium text-gray-600">GR No:</span>

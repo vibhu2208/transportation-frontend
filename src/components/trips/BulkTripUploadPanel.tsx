@@ -40,13 +40,23 @@ function downloadTemplate() {
   XLSX.writeFile(wb, 'bulk-trips-template.xlsx');
 }
 
-export function BulkTripUploadPanel({ onTripsCreated }: { onTripsCreated?: () => void }) {
+export function BulkTripUploadPanel({
+  onTripsCreated,
+  embedded,
+}: {
+  onTripsCreated?: () => void;
+  /** When true, no outer card chrome (for accordion / collapsible parent). */
+  embedded?: boolean;
+}) {
   const [vendors, setVendors] = useState<VendorOption[]>([]);
   const [vendorsLoading, setVendorsLoading] = useState(false);
   const [vendorId, setVendorId] = useState('');
   const [uploading, setUploading] = useState(false);
   const [mapping, setMapping] = useState(false);
   const [committing, setCommitting] = useState(false);
+  const [bulkUploadProgress, setBulkUploadProgress] = useState<{ completed: number; total: number } | null>(
+    null,
+  );
   const [rows, setRows] = useState<PreviewRow[]>([]);
 
   useEffect(() => {
@@ -89,7 +99,7 @@ export function BulkTripUploadPanel({ onTripsCreated }: { onTripsCreated?: () =>
     setUploading(true);
     try {
       const res = await api.post<{ rows: PreviewRow[] }>('/trips/bulk-upload/preview', formData, {
-        timeout: 120000,
+        timeout: 300000,
         transformRequest: [
           (data, headers) => {
             if (data instanceof FormData) {
@@ -209,30 +219,63 @@ export function BulkTripUploadPanel({ onTripsCreated }: { onTripsCreated?: () =>
     });
   }, [vendorId, rows]);
 
+  const rowToPayload = (r: PreviewRow) => ({
+    rowIndex: r.rowIndex,
+    date: r.date as string,
+    partyName: r.partyName as string,
+    fromLocation: r.fromLocation as string,
+    toLocation: r.toLocation as string,
+    vehicleNumber: r.resolvedVehicleNumber as string,
+    freight: r.freight ?? undefined,
+    initialExpense: r.initialExpense ?? undefined,
+    advance: r.advance ?? undefined,
+  });
+
   const commit = async () => {
     if (!canCommit) return;
-    setCommitting(true);
-    try {
-      const payload = {
-        vendorId,
-        rows: rows.map((r) => ({
-          rowIndex: r.rowIndex,
-          date: r.date as string,
-          partyName: r.partyName as string,
-          fromLocation: r.fromLocation as string,
-          toLocation: r.toLocation as string,
-          vehicleNumber: r.resolvedVehicleNumber as string,
-          freight: r.freight ?? undefined,
-          initialExpense: r.initialExpense ?? undefined,
-          advance: r.advance ?? undefined,
-        })),
-      };
-      const res = await api.post<{
-        created: { rowIndex: number; tripNo: string; tripId: string }[];
-        failed: { rowIndex: number; message: string }[];
-      }>('/trips/bulk-upload/commit', payload, { timeout: 120000 });
+    const rowList = rows;
+    const total = rowList.length;
+    // ≤150 rows: one trip per request for accurate progress; larger: chunks of 25 to limit HTTP calls
+    const chunkSize = total <= 150 ? 1 : 25;
 
-      const { created, failed } = res.data;
+    setCommitting(true);
+    setBulkUploadProgress({ completed: 0, total });
+
+    const created: { rowIndex: number; tripNo: string; tripId: string }[] = [];
+    const failed: { rowIndex: number; message: string }[] = [];
+
+    try {
+      for (let start = 0; start < rowList.length; start += chunkSize) {
+        const chunk = rowList.slice(start, start + chunkSize);
+        const payload = {
+          vendorId,
+          rows: chunk.map(rowToPayload),
+        };
+        try {
+          const res = await api.post<{
+            created: { rowIndex: number; tripNo: string; tripId: string }[];
+            failed: { rowIndex: number; message: string }[];
+          }>('/trips/bulk-upload/commit', payload, {
+            timeout: Math.max(120000, chunk.length * 15000),
+          });
+          const c = res.data?.created ?? [];
+          const f = res.data?.failed ?? [];
+          if (c.length) created.push(...c);
+          if (f.length) failed.push(...f);
+        } catch (err: unknown) {
+          const msg =
+            err && typeof err === 'object' && 'response' in err
+              ? (err as { response?: { data?: { message?: unknown } } }).response?.data?.message
+              : null;
+          const message =
+            typeof msg === 'string' ? msg : Array.isArray(msg) ? msg.join(', ') : 'Request failed';
+          for (const r of chunk) {
+            failed.push({ rowIndex: r.rowIndex, message });
+          }
+        }
+        setBulkUploadProgress({ completed: Math.min(start + chunk.length, total), total });
+      }
+
       if (created.length) {
         toast.success(`Created ${created.length} trip(s)`);
       }
@@ -249,23 +292,36 @@ export function BulkTripUploadPanel({ onTripsCreated }: { onTripsCreated?: () =>
         setRows([]);
         onTripsCreated?.();
       }
-    } catch {
-      toast.error('Bulk commit failed');
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { message?: unknown } } }).response?.data?.message
+          : null;
+      toast.error(
+        typeof msg === 'string' ? msg : Array.isArray(msg) ? msg.join(', ') : 'Bulk commit failed',
+      );
     } finally {
       setCommitting(false);
+      setBulkUploadProgress(null);
     }
   };
 
   return (
-    <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-md sm:p-6">
+    <div className={embedded ? 'space-y-4' : 'rounded-xl border border-slate-200/80 bg-white p-4 shadow-md sm:p-6'}>
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900">Bulk upload (Excel)</h3>
+        {embedded ? (
           <p className="text-sm text-slate-600">
-            Columns: DATE, PARTY NAME, FROM LOCATION, TO LOCATION, VEHICLE (last 4 digits), FREIGHT, optional EXP /
-            ADV.
+            Columns: DATE, PARTY NAME, FROM, TO, VEHICLE (last 4), FREIGHT, optional EXP / ADV.
           </p>
-        </div>
+        ) : (
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900">Bulk upload (Excel)</h3>
+            <p className="text-sm text-slate-600">
+              Columns: DATE, PARTY NAME, FROM LOCATION, TO LOCATION, VEHICLE (last 4 digits), FREIGHT, optional EXP /
+              ADV.
+            </p>
+          </div>
+        )}
         <Button type="button" variant="outline" size="sm" onClick={downloadTemplate} className="shrink-0 gap-2">
           <Download className="h-4 w-4" />
           Template
@@ -276,7 +332,7 @@ export function BulkTripUploadPanel({ onTripsCreated }: { onTripsCreated?: () =>
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Vendor (all rows)</label>
           {vendors.length > 0 ? (
-            <Select value={vendorId} onValueChange={setVendorId}>
+            <Select value={vendorId} onValueChange={setVendorId} disabled={committing}>
               <SelectTrigger>
                 <SelectValue placeholder={vendorsLoading ? 'Loading…' : 'Select vendor'} />
               </SelectTrigger>
@@ -297,7 +353,7 @@ export function BulkTripUploadPanel({ onTripsCreated }: { onTripsCreated?: () =>
           <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">
             <Upload className="h-4 w-4 text-slate-500" />
             <span>{uploading ? 'Parsing…' : 'Choose .xlsx file'}</span>
-            <input type="file" accept=".xlsx,.xls" className="hidden" onChange={onFile} disabled={uploading} />
+            <input type="file" accept=".xlsx,.xls" className="hidden" onChange={onFile} disabled={uploading || committing} />
           </label>
         </div>
       </div>
@@ -307,7 +363,7 @@ export function BulkTripUploadPanel({ onTripsCreated }: { onTripsCreated?: () =>
           type="button"
           variant="secondary"
           onClick={mapVehicles}
-          disabled={mapping || rows.length === 0}
+          disabled={mapping || committing || rows.length === 0}
           className="gap-2"
         >
           {mapping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
@@ -318,6 +374,31 @@ export function BulkTripUploadPanel({ onTripsCreated }: { onTripsCreated?: () =>
           Create trips
         </Button>
       </div>
+
+      {bulkUploadProgress && (
+        <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50/95 px-4 py-3 shadow-sm">
+          <div className="flex items-start gap-3">
+            <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-emerald-600" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-emerald-900">Uploading trips…</p>
+              <p className="mt-0.5 text-sm text-emerald-800">
+                <span className="font-semibold tabular-nums">{bulkUploadProgress.completed}</span>
+                {' of '}
+                <span className="tabular-nums">{bulkUploadProgress.total}</span>
+                {' trips uploaded'}
+              </p>
+              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-emerald-200/70">
+                <div
+                  className="h-full rounded-full bg-emerald-600 transition-[width] duration-300 ease-out"
+                  style={{
+                    width: `${bulkUploadProgress.total ? (bulkUploadProgress.completed / bulkUploadProgress.total) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {rows.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-slate-200">

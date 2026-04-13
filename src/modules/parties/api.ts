@@ -1,5 +1,12 @@
 import { api } from '@/lib/api';
-import { CreatePartyRequest, UpdatePartyRequest, Party, PartyDetailResponse } from './types';
+import {
+  CreatePartyRequest,
+  CreatePartyBranchRequest,
+  UpdatePartyRequest,
+  Party,
+  PartyDetailResponse,
+  PartyBranch,
+} from './types';
 
 export const partiesApi = {
   async getParties(): Promise<Party[]> {
@@ -16,6 +23,16 @@ export const partiesApi = {
 
   async getPartyDetail(id: string): Promise<PartyDetailResponse> {
     const response = await api.get(`/parties/${id}/detail`);
+    return response.data;
+  },
+
+  async listPartyBranches(partyId: string): Promise<PartyBranch[]> {
+    const response = await api.get(`/parties/${partyId}/branches`);
+    return response.data;
+  },
+
+  async createPartyBranch(partyId: string, data: CreatePartyBranchRequest): Promise<PartyBranch> {
+    const response = await api.post(`/parties/${partyId}/branches`, data);
     return response.data;
   },
 

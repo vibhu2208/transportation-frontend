@@ -10,6 +10,7 @@ export interface Trip {
   effectiveFreight?: number;
   status: string;
   invoiceId?: string;
+  partyBranchId?: string | null;
   goodsReceipts?: any[];
   vendor?: any;
 }
@@ -23,6 +24,7 @@ export interface PendingTripsByParty {
 export interface CreateInvoiceRequest {
   tripIds: string[];
   partyId?: string;
+  partyBranchId?: string;
   partyName: string;
   partyGstIn?: string;
   partyAddress?: string;
@@ -65,6 +67,7 @@ export interface Invoice {
   invoiceDate: string;
   partyName: string;
   partyId?: string | null;
+  partyBranchId?: string | null;
   partyGstIn?: string;
   partyAddress?: string;
   subTotal: number;
