@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Plus, Edit2, Trash2, RefreshCw, Users, Mail, Phone, MapPin } from 'lucide-react';
+import { Loader2, Plus, Edit2, Power, RefreshCw, Mail, Phone, MapPin } from 'lucide-react';
 import { partiesApi } from './api';
 import { Party, CreatePartyRequest } from './types';
 
@@ -92,16 +92,16 @@ export default function PartyManagement() {
     setShowForm(true);
   };
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
+  const handleDeactivate = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (!confirm('Are you sure you want to delete this party?')) return;
+    if (!confirm('Are you sure you want to deactivate this party?')) return;
     try {
       setLoading(true);
-      await partiesApi.deleteParty(id);
-      setSuccess('Party deleted successfully');
+      await partiesApi.deactivateParty(id);
+      setSuccess('Party deactivated successfully');
       await loadParties();
     } catch (err) {
-      setError('Failed to delete party');
+      setError('Failed to deactivate party');
     } finally {
       setLoading(false);
     }
@@ -229,13 +229,25 @@ export default function PartyManagement() {
                 <Button variant="ghost" size="sm" onClick={(e) => handleEdit(e, party)}>
                   <Edit2 className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="sm" onClick={(e) => handleDelete(e, party.id)} className="text-red-500">
-                  <Trash2 className="h-4 w-4" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => handleDeactivate(e, party.id)}
+                  className="text-amber-600"
+                  disabled={!party.isActive}
+                  title={party.isActive ? 'Deactivate party' : 'Party is already inactive'}
+                >
+                  <Power className="h-4 w-4" />
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-2 text-sm">
+                {!party.isActive && (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">Inactive</Badge>
+                  </div>
+                )}
                 {party.gstIn && (
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">GST: {party.gstIn}</Badge>

@@ -199,6 +199,9 @@ export default function InvoiceManagement() {
   const getRemaining = (inv: Invoice) =>
     Math.max(0, Math.round((inv.grandTotal - getPaidTotal(inv)) * 100) / 100);
 
+  const getInvoicePaymentTag = (inv: Invoice) =>
+    getRemaining(inv) <= 0.01 ? 'PAID' : 'UNPAID';
+
   const toggleMoneyReceiptSection = (invoiceId: string) => {
     if (moneyReceiptOpenFor === invoiceId) {
       setMoneyReceiptOpenFor(null);
@@ -705,10 +708,10 @@ export default function InvoiceManagement() {
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="text-base font-semibold text-slate-900">{invoice.invoiceNo}</h3>
                           <Badge
-                            variant={invoice.status === 'DRAFT' ? 'secondary' : 'default'}
+                            variant={getInvoicePaymentTag(invoice) === 'PAID' ? 'default' : 'secondary'}
                             className="rounded-md"
                           >
-                            {invoice.status}
+                            {getInvoicePaymentTag(invoice)}
                           </Badge>
                         </div>
                         <p className="text-sm text-slate-600">
