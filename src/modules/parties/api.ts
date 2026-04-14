@@ -46,8 +46,9 @@ export const partiesApi = {
     return response.data;
   },
 
-  async deleteParty(id: string): Promise<void> {
-    await api.delete(`/parties/${id}`);
+  async deactivateParty(id: string): Promise<Party> {
+    const response = await api.delete(`/parties/${id}`);
+    return response.data;
   },
 
   async syncParties(): Promise<Party[]> {

@@ -341,7 +341,7 @@ export default function MoneyReceiptPage() {
       totalTds += t;
       totalDed += Math.max(0, Math.round((rem - t - r) * 100) / 100);
     }
-    const applied = Math.round((totalReceived + totalTds) * 100) / 100;
+    const applied = Math.round((totalReceived + totalTds + totalDed) * 100) / 100;
     const balanceRemaining = Math.max(0, Math.round((totalPending - applied) * 100) / 100);
     return {
       totalInvoiceAmount: sumInvAmt,
