@@ -13,7 +13,7 @@ function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const proxyDisabled = process.env.NEXT_PUBLIC_API_USE_PROXY === 'false';
     if (!proxyDisabled) {
-      return `${window.location.origin}/api-backend`;
+      return `${window.location.origin}/api`;
     }
   }
   const fromEnv = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3000';

@@ -11,10 +11,6 @@ const nextConfig = {
         destination: '/_next/static/chunks/sw.js',
       },
       // Browser calls same origin → Next forwards to Nest (fixes "Cannot POST" when API URL pointed at Next by mistake)
-      {
-        source: '/api-backend/:path*',
-        destination: `${backendUrl}/:path*`,
-      },
     ];
   },
   // Enable static generation for service worker
