@@ -520,10 +520,11 @@ export function PartyDetailView(props: Props) {
 
           {tab === 'grs' && (
             <div className="overflow-x-auto rounded-lg border border-slate-200">
-              <table className="w-full min-w-[720px] text-sm">
+              <table className="w-full min-w-[900px] text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                    <th className="px-3 py-2 font-medium text-slate-700">GR / CN</th>
+                    <th className="px-3 py-2 font-medium text-slate-700">GR No. / CN No.</th>
+                    <th className="px-3 py-2 font-medium text-slate-700">Party Bill No.</th>
                     <th className="px-3 py-2 font-medium text-slate-700">Date</th>
                     <th className="px-3 py-2 font-medium text-slate-700">Route</th>
                     <th className="px-3 py-2 font-medium text-slate-700">Trip</th>
@@ -534,16 +535,17 @@ export function PartyDetailView(props: Props) {
                 <tbody>
                   {data.goodsReceipts.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-3 py-8 text-center text-slate-500">
+                      <td colSpan={7} className="px-3 py-8 text-center text-slate-500">
                         No goods receipts for this party&apos;s trips.
                       </td>
                     </tr>
                   ) : (
                     data.goodsReceipts.map((gr) => (
                       <tr key={gr.id} className="border-b border-slate-100 last:border-0">
-                        <td className="px-3 py-2 font-mono text-xs">{gr.grNo || gr.cnNo || '—'}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{gr.grNo || '—'}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{gr.partyBillNo || '—'}</td>
                         <td className="px-3 py-2 text-slate-600">
-                          {gr.cnDate ? new Date(gr.cnDate).toLocaleDateString('en-IN') : '—'}
+                          {gr.grDate ? new Date(gr.grDate).toLocaleDateString('en-IN') : '—'}
                         </td>
                         <td className="max-w-[200px] px-3 py-2 text-xs text-slate-700">
                           {(gr.fromStation || '—') + ' → ' + (gr.toStation || '—')}

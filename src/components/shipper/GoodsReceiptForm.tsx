@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import ImageUpload from '@/components/ui/ImageUpload';
@@ -15,8 +15,7 @@ interface Trip {
   fromLocation: string;
   toLocation: string;
   freight?: number | null;
-  branchName?: string | null;
-  billDate?: string | null;
+  ewayBillNumber?: string | null;
   ewayDate?: string | null;
 }
 
@@ -25,23 +24,48 @@ interface Props {
   onComplete: () => void;
 }
 
-function toDateInput(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toISOString().split('T')[0];
-}
+/** UI-only e-way fields; submitted as `tripEwaySync`, not as GR columns. */
+type GoodsReceiptFormState = Partial<CreateGoodsReceiptDto> & {
+  ewayBillNumber?: string;
+  ewayDate?: string;
+};
+
+const toIsoDate = (value: string): string => {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+
+  const ddmmyyyyMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!ddmmyyyyMatch) return '';
+
+  const [, dd, mm, yyyy] = ddmmyyyyMatch;
+  const day = Number(dd);
+  const month = Number(mm);
+  const year = Number(yyyy);
+  const parsed = new Date(year, month - 1, day);
+  const isValid =
+    parsed.getFullYear() === year &&
+    parsed.getMonth() === month - 1 &&
+    parsed.getDate() === day;
+
+  return isValid ? `${yyyy}-${mm}-${dd}` : '';
+};
+
+const toEwayDateInput = (value: string | null | undefined): string => {
+  if (!value) return '';
+  const day = String(value).split('T')[0];
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : '';
+};
 
 export default function GoodsReceiptForm({ trip, onComplete }: Props) {
+  const draftStorageKey = useMemo(() => `gr_draft_goods_receipt_form_${trip.id}`, [trip.id]);
   const [loading, setLoading] = useState(false);
   const [grBiltyImages, setGrBiltyImages] = useState<string[]>([]);
-  const [formData, setFormData] = useState<Partial<CreateGoodsReceiptDto>>({
+  const [formData, setFormData] = useState<GoodsReceiptFormState>({
     tripId: trip.id,
-    cnNo: trip.tripNo,
-    cnDate: new Date().toISOString().split('T')[0],
-    cnTime: new Date().toLocaleTimeString(),
-    branchName: trip.branchName || '',
-    ewayDate: toDateInput(trip.ewayDate),
+    branchId: '',
+    grDate: '',
+    cnTime: '',
     grNo: '',
     truckLorryNo: trip.vehicleNumber,
     agentTruck: trip.vehicleNumber,
@@ -52,11 +76,46 @@ export default function GoodsReceiptForm({ trip, onComplete }: Props) {
     toll: '',
     labourCharges: '',
     otherCharges: '',
+    ewayBillNumber: trip.ewayBillNumber?.trim() || '',
+    ewayDate: toEwayDateInput(trip.ewayDate ?? undefined),
   });
 
   const handleInputChange = (field: string, value: string) => {
     setFormData({ ...formData, [field]: value });
   };
+
+  useEffect(() => {
+    try {
+      const rawDraft = localStorage.getItem(draftStorageKey);
+      if (!rawDraft) return;
+      const parsedDraft = JSON.parse(rawDraft) as {
+        formData?: GoodsReceiptFormState;
+        grBiltyImages?: string[];
+      };
+      if (parsedDraft.formData) {
+        setFormData((prev) => ({ ...prev, ...parsedDraft.formData, tripId: trip.id }));
+      }
+      if (Array.isArray(parsedDraft.grBiltyImages)) {
+        setGrBiltyImages(parsedDraft.grBiltyImages);
+      }
+    } catch {
+      // Ignore malformed local drafts.
+    }
+  }, [draftStorageKey, trip.id]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        draftStorageKey,
+        JSON.stringify({
+          formData,
+          grBiltyImages,
+        }),
+      );
+    } catch {
+      // Ignore storage errors to avoid blocking form usage.
+    }
+  }, [draftStorageKey, formData, grBiltyImages]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,13 +130,22 @@ export default function GoodsReceiptForm({ trip, onComplete }: Props) {
 
     try {
       setLoading(true);
+      const normalizedGrDate = toIsoDate(String(formData.grDate || ''));
+      const ewayDay = String(formData.ewayDate || '').trim();
+      const { ewayBillNumber: _eBill, ewayDate: _eDate, ...formRest } = formData as Record<string, unknown>;
       const submitData = {
-        ...formData,
+        ...formRest,
+        grDate: normalizedGrDate || undefined,
         shipperId: user.id,
         grBiltyImages,
+        tripEwaySync: {
+          billNumber: (formData.ewayBillNumber || '').trim(),
+          date: ewayDay || '',
+        },
       } as CreateGoodsReceiptDto;
 
       await goodsReceiptApi.create(submitData);
+      localStorage.removeItem(draftStorageKey);
       onComplete();
     } catch (error: any) {
       console.error('Failed to submit GR:', error);
@@ -90,31 +158,7 @@ export default function GoodsReceiptForm({ trip, onComplete }: Props) {
   return (
     <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg shadow">
       <h2 className="text-2xl font-bold mb-6">Goods Receipt Form</h2>
-      <p className="text-sm text-gray-600 -mt-4 mb-2">
-        Freight and bill date are on the trip. Branch and e-way here update the trip when you submit.
-      </p>
-
-      <section className="space-y-4">
-        <h3 className="text-lg font-semibold border-b pb-2">Trip-linked (read-only)</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Freight (trip)</label>
-            <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
-              {trip.freight != null && trip.freight !== undefined
-                ? `₹${Number(trip.freight).toLocaleString('en-IN')}`
-                : '—'}
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Bill date (trip)</label>
-            <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
-              {trip.billDate
-                ? new Date(trip.billDate).toLocaleDateString('en-IN')
-                : '—'}
-            </div>
-          </div>
-        </div>
-      </section>
+      <p className="text-sm text-gray-600 -mt-4 mb-2">Trip prefill is optional. All fields are editable.</p>
 
       <section className="space-y-4">
         <h3 className="text-lg font-semibold border-b pb-2">Consignment</h3>
@@ -122,18 +166,10 @@ export default function GoodsReceiptForm({ trip, onComplete }: Props) {
           <div>
             <label className="block text-sm font-medium mb-1">Branch *</label>
             <Input
-              value={formData.branchName || ''}
-              onChange={(e) => handleInputChange('branchName', e.target.value)}
+              value={formData.branchId || ''}
+              onChange={(e) => handleInputChange('branchId', e.target.value)}
+              placeholder="Enter branch id"
               required
-            />
-            <p className="mt-1 text-xs text-gray-500">Stored on the trip.</p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">E-way date</label>
-            <Input
-              type="date"
-              value={formData.ewayDate || ''}
-              onChange={(e) => handleInputChange('ewayDate', e.target.value)}
             />
           </div>
           <div>
@@ -173,9 +209,11 @@ export default function GoodsReceiptForm({ trip, onComplete }: Props) {
           <div>
             <label className="block text-sm font-medium mb-1">Date *</label>
             <Input
-              type="date"
-              value={formData.cnDate || ''}
-              onChange={(e) => handleInputChange('cnDate', e.target.value)}
+              type="text"
+              value={formData.grDate || ''}
+              onChange={(e) => handleInputChange('grDate', e.target.value)}
+              placeholder="dd/mm/yyyy"
+              pattern="\d{2}/\d{2}/\d{4}"
               required
             />
           </div>
@@ -186,6 +224,22 @@ export default function GoodsReceiptForm({ trip, onComplete }: Props) {
               value={formData.cnTime || ''}
               onChange={(e) => handleInputChange('cnTime', e.target.value)}
               required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">E-way bill number (optional)</label>
+            <Input
+              value={formData.ewayBillNumber || ''}
+              onChange={(e) => handleInputChange('ewayBillNumber', e.target.value)}
+              placeholder="Prefilled from trip when available"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">E-way date (optional)</label>
+            <Input
+              type="date"
+              value={formData.ewayDate || ''}
+              onChange={(e) => handleInputChange('ewayDate', e.target.value)}
             />
           </div>
         </div>

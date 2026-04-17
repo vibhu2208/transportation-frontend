@@ -6,6 +6,7 @@ export interface Trip {
   fromLocation: string;
   toLocation: string;
   vehicleNumber: string;
+  grLrNo?: string | null;
   freight?: number | null;
   effectiveFreight?: number;
   status: string;
@@ -22,6 +23,10 @@ export interface PendingTripsByParty {
 }
 
 export interface CreateInvoiceRequest {
+  invoiceNo: string;
+  invoiceDate?: string;
+  dueDate?: string | null;
+  delivered?: boolean;
   tripIds: string[];
   partyId?: string;
   partyBranchId?: string;
@@ -65,6 +70,8 @@ export interface Invoice {
   id: string;
   invoiceNo: string;
   invoiceDate: string;
+  dueDate?: string | null;
+  delivered?: boolean;
   partyName: string;
   partyId?: string | null;
   partyBranchId?: string | null;

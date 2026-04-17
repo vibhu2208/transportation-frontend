@@ -66,8 +66,8 @@ export interface PartyDetailInvoiceRow {
 export interface PartyDetailGrRow {
   id: string;
   grNo: string | null;
-  cnNo: string | null;
-  cnDate: string | null;
+  partyBillNo: string | null;
+  grDate: string | null;
   fromStation: string | null;
   toStation: string | null;
   /** Trip freight (single source; no duplicate on GR). */

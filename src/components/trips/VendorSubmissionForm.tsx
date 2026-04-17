@@ -36,15 +36,11 @@ function buildVendorSubmissionSchema(forAdmin: boolean) {
       advance: optionalNumber,
       freight: optionalNumber,
       remarks: z.string().optional(),
+      ewayBillNumber: z.string().optional(),
+      ewayDate: z.string().optional(),
     })
-    .superRefine((data, ctx) => {
-      if (forAdmin && !data.vendorId?.trim()) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Vendor is required',
-          path: ['vendorId'],
-        });
-      }
+    .superRefine((_data, _ctx) => {
+      // Vendor is auto-assigned for admin submissions.
     });
 }
 
@@ -83,7 +79,6 @@ export function VendorSubmissionForm({
   const [isLoading, setIsLoading] = useState(false);
   const [parties, setParties] = useState<Party[]>([]);
   const [vendors, setVendors] = useState<VendorOption[]>([]);
-  const [vendorsLoading, setVendorsLoading] = useState(false);
 
   useEffect(() => {
     const fetchParties = async () => {
@@ -118,7 +113,6 @@ export function VendorSubmissionForm({
   useEffect(() => {
     if (!forAdmin) return;
     const loadVendors = async () => {
-      setVendorsLoading(true);
       try {
         const token = localStorage.getItem('auth_token');
         const res = await api.get<VendorOption[]>('/vendors', {
@@ -127,8 +121,6 @@ export function VendorSubmissionForm({
         setVendors(res.data ?? []);
       } catch (e) {
         console.error('VendorSubmissionForm: failed to load vendors', e);
-      } finally {
-        setVendorsLoading(false);
       }
     };
     loadVendors();
@@ -141,6 +133,7 @@ export function VendorSubmissionForm({
     formState: { errors },
     reset,
     control,
+    setValue,
   } = useForm<VendorSubmissionData>({
     resolver: zodResolver(buildVendorSubmissionSchema(forAdmin)),
     defaultValues: {
@@ -150,11 +143,30 @@ export function VendorSubmissionForm({
   });
   const selectedPartyName = watch('partyName') || '';
   const isMarketParty = selectedPartyName.trim().toLowerCase().includes('market');
+  const defaultVendor = vendors.find(
+    (v) => v.name.trim().toLowerCase() === 'test transport vendor',
+  );
+
+  useEffect(() => {
+    if (!forAdmin) return;
+    if (defaultVendor?.id) {
+      setValue('vendorId', defaultVendor.id, { shouldValidate: false });
+    }
+  }, [forAdmin, defaultVendor?.id, setValue]);
 
   const onSubmit = async (data: VendorSubmissionData) => {
     setIsLoading(true);
     try {
       const payload: Record<string, unknown> = { ...data };
+      if (forAdmin) {
+        const fallbackVendor =
+          defaultVendor?.id || vendors.find((v) => v.name.trim().toLowerCase() === 'test transport vendor')?.id;
+        if (!fallbackVendor) {
+          toast.error('Default vendor "Test Transport Vendor" not found in vendor list');
+          return;
+        }
+        payload.vendorId = fallbackVendor;
+      }
       if (!isMarketParty) {
         delete payload.advance;
       }
@@ -189,71 +201,40 @@ export function VendorSubmissionForm({
   const shellClass = embedded
     ? ''
     : 'max-w-4xl mx-auto p-4 sm:p-6 bg-white rounded-lg shadow-sm border border-border';
+  const wrapperGapClass = embedded ? 'mb-3' : 'mb-6';
+  const titleClass = embedded ? 'text-lg font-bold text-foreground mb-0.5' : 'text-2xl font-bold text-foreground mb-2';
+  const formGapClass = embedded ? 'space-y-3' : 'space-y-6';
+  const gridGapClass = embedded ? 'grid grid-cols-1 md:grid-cols-2 gap-3' : 'grid grid-cols-1 md:grid-cols-2 gap-6';
+  const labelClass = embedded
+    ? 'block text-xs font-semibold text-foreground mb-1'
+    : 'block text-sm font-medium text-foreground mb-2';
+  const controlClass = embedded ? 'h-9 text-sm' : '';
 
   return (
     <div className={shellClass}>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-foreground mb-2">Submit Trip Booking</h2>
-        <p className="text-muted-foreground">Enter the basic trip details. Operations and billing information will be added later by the admin team.</p>
+      <div className={wrapperGapClass}>
+        <h2 className={titleClass}>Submit Trip Booking</h2>
+        {!embedded && (
+          <p className="text-muted-foreground">Enter the basic trip details. Operations and billing information will be added later by the admin team.</p>
+        )}
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {forAdmin && (
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-foreground mb-2">
-                Vendor *
-              </label>
-              {vendors.length > 0 ? (
-                <Controller
-                  name="vendorId"
-                  control={control}
-                  render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger className={errors.vendorId ? 'border-destructive' : ''}>
-                        <SelectValue placeholder="Select a vendor" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {vendors.map((v) => (
-                          <SelectItem key={v.id} value={v.id}>
-                            {v.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              ) : (
-                <Input
-                  {...register('vendorId')}
-                  error={errors.vendorId?.message}
-                  placeholder="Vendor ID"
-                />
-              )}
-              {errors.vendorId && (
-                <p className="mt-1 text-sm text-destructive">{errors.vendorId.message}</p>
-              )}
-              {vendors.length === 0 && !vendorsLoading && (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  No vendors loaded. Enter vendor ID manually or check Settings → Vendors.
-                </p>
-              )}
-            </div>
-          )}
-
+      <form onSubmit={handleSubmit(onSubmit)} className={formGapClass}>
+        <div className={gridGapClass}>
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
+            <label className={labelClass}>
               Date *
             </label>
             <Input
               type="date"
               {...register('date')}
               error={errors.date?.message}
+              className={controlClass}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
+            <label className={labelClass}>
               Party Name *
             </label>
             {parties.length > 0 ? (
@@ -265,7 +246,7 @@ export function VendorSubmissionForm({
                     onValueChange={field.onChange}
                     value={field.value}
                   >
-                    <SelectTrigger className={errors.partyName ? 'border-destructive' : ''}>
+                    <SelectTrigger className={`${controlClass} ${errors.partyName ? 'border-destructive' : ''}`}>
                       <SelectValue placeholder="Select a party" />
                     </SelectTrigger>
                     <SelectContent>
@@ -283,6 +264,7 @@ export function VendorSubmissionForm({
                 {...register('partyName')}
                 error={errors.partyName?.message}
                 placeholder="Type party name"
+                className={controlClass}
               />
             )}
             {errors.partyName && (
@@ -294,29 +276,31 @@ export function VendorSubmissionForm({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
+            <label className={labelClass}>
               From Location *
             </label>
             <Input
               {...register('fromLocation')}
               error={errors.fromLocation?.message}
               placeholder="Starting location"
+              className={controlClass}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
+            <label className={labelClass}>
               To Location *
             </label>
             <Input
               {...register('toLocation')}
               error={errors.toLocation?.message}
               placeholder="Destination location"
+              className={controlClass}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
+            <label className={labelClass}>
               Vehicle Number *
             </label>
             <Controller
@@ -337,7 +321,7 @@ export function VendorSubmissionForm({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
+            <label className={labelClass}>
               Initial Expense
             </label>
             <Input
@@ -346,11 +330,12 @@ export function VendorSubmissionForm({
               {...register('initialExpense', { valueAsNumber: true })}
               error={errors.initialExpense?.message}
               placeholder="0.00"
+              className={controlClass}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
+            <label className={labelClass}>
               Freight
             </label>
             <Input
@@ -359,12 +344,13 @@ export function VendorSubmissionForm({
               {...register('freight', { valueAsNumber: true })}
               error={errors.freight?.message}
               placeholder="0.00"
+              className={controlClass}
             />
           </div>
 
           {isMarketParty && (
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
+              <label className={labelClass}>
                 Advance (Market Party Only)
               </label>
               <Input
@@ -373,18 +359,43 @@ export function VendorSubmissionForm({
                 {...register('advance', { valueAsNumber: true })}
                 error={errors.advance?.message}
                 placeholder="0.00"
+                className={controlClass}
               />
             </div>
           )}
 
+          <div>
+            <label className={labelClass}>
+              E-way Bill Number
+            </label>
+            <Input
+              {...register('ewayBillNumber')}
+              error={errors.ewayBillNumber?.message}
+              placeholder="Optional e-way bill no."
+              className={controlClass}
+            />
+          </div>
+
+          <div>
+            <label className={labelClass}>
+              E-way Expiry Date
+            </label>
+            <Input
+              type="date"
+              {...register('ewayDate')}
+              error={errors.ewayDate?.message}
+              className={controlClass}
+            />
+          </div>
+
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-foreground mb-2">
+            <label className={labelClass}>
               Remarks
             </label>
             <textarea
               {...register('remarks')}
-              rows={3}
-              className="w-full h-20 rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
+              rows={embedded ? 2 : 3}
+              className={`w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none ${embedded ? 'h-14' : 'h-20'}`}
               placeholder="Any additional notes or remarks"
             />
             {errors.remarks && (
@@ -393,28 +404,7 @@ export function VendorSubmissionForm({
           </div>
         </div>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-blue-800">
-                Information
-              </h3>
-              <div className="mt-2 text-sm text-blue-700">
-                <p>
-                  After submission, the operations team will add BR No, GR/LR No, and toll expenses. 
-                  The accounts team will then add freight and billing information to complete the trip record.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center gap-2">
           <Button type="submit" disabled={isLoading}>
             {isLoading ? 'Submitting...' : 'Submit Trip'}
           </Button>
