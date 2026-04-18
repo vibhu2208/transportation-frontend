@@ -14,6 +14,7 @@ interface Trip {
   toLocation: string;
   partyName: string;
   hasGR?: boolean;
+  invoiceId?: string | null;
 }
 
 export default function ShipperDashboard() {

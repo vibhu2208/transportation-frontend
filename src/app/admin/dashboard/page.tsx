@@ -21,6 +21,7 @@ import {
   BellRing,
   MessageSquare,
   Upload,
+  FileBadge,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
@@ -30,6 +31,7 @@ import { VehicleDashboard } from '@/modules/analytics/VehicleDashboard';
 import InvoiceManagement from '@/modules/invoices/InvoiceManagement';
 import MoneyReceiptPage from '@/modules/money-receipt/MoneyReceiptPage';
 import PartyManagement from '@/modules/parties/PartyManagement';
+import { VehicleDocumentsPanel } from '@/modules/vehicles/VehicleDocumentsPanel';
 import { AdminDashboardOverview, type DashboardAlert } from '@/components/admin/AdminDashboardOverview';
 import { Button } from '@/components/ui/Button';
 import { VendorSubmissionForm } from '@/components/trips/VendorSubmissionForm';
@@ -47,6 +49,7 @@ const DASHBOARD_TAB_KEYS = new Set([
   'moneyReceipt',
   'parties',
   'vehicles',
+  'vehicleDocuments',
   'settings',
 ]);
 
@@ -57,6 +60,7 @@ type DashboardTab =
   | 'moneyReceipt'
   | 'parties'
   | 'vehicles'
+  | 'vehicleDocuments'
   | 'settings';
 
 type AdminTrip = {
@@ -103,6 +107,8 @@ type AdminTrip = {
   detentionLoading?: number;
   detentionUL?: number;
   totalExpense?: number;
+  profitLossWithoutDeduction?: number;
+  deductionAmount?: number;
   profitLoss?: number;
 };
 
@@ -127,6 +133,7 @@ const DASHBOARD_TABS: Array<{
   { key: 'moneyReceipt', label: 'Money receipt', icon: WalletCards },
   { key: 'parties', label: 'Parties', icon: Building2 },
   { key: 'vehicles', label: 'Vehicles', icon: CarFront },
+  { key: 'vehicleDocuments', label: 'Vehicle docs', icon: FileBadge },
   { key: 'settings', label: 'Settings', icon: Settings },
 ];
 
@@ -566,6 +573,10 @@ function AdminDashboardInner() {
 
           {activeTab === 'vehicles' && (
             <VehicleDashboard />
+          )}
+
+          {activeTab === 'vehicleDocuments' && (
+            <VehicleDocumentsPanel />
           )}
 
           {activeTab === 'invoices' && (

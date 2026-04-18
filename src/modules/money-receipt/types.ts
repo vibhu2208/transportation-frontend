@@ -33,6 +33,7 @@ export interface MoneyReceiptInvoiceLinePayload {
   invoiceId: string;
   receivedAmount: number;
   tdsAmount: number;
+  deductionAmount?: number;
 }
 
 export interface CreateMoneyReceiptPayload {
@@ -71,6 +72,25 @@ export interface ReceiptMappingRow {
   grNo: string;
   invoiceNo: string;
   receiptNo: string;
+  deductionAmount: number;
+}
+
+/** Row returned by GET /money-receipt */
+export interface MoneyReceiptListItem {
+  id: string;
+  receiptNo: string;
+  receiptDate: string;
+  partyId: string;
+  partyName: string;
+  paymentMode: string;
+  referenceNo: string | null;
+  status: string;
+  totalReceived: number;
+  allocationCount: number;
+  /** Distinct invoice numbers on this receipt (comma-separated), or "—" */
+  invoiceNosSummary: string;
+  /** Distinct GR numbers from allocations (comma-separated), or "—" */
+  grNosSummary: string;
 }
 
 export interface Branch {

@@ -12,7 +12,8 @@ export interface Trip {
   status: string;
   invoiceId?: string;
   partyBranchId?: string | null;
-  goodsReceipts?: any[];
+  /** Linked GR records (grNo from goods_receipts); preferred over grLrNo for display */
+  goodsReceipts?: Array<{ grNo?: string | null; gstMovementType?: 'INTRA_STATE' | 'INTER_STATE' }>;
   vendor?: any;
 }
 
@@ -34,6 +35,7 @@ export interface CreateInvoiceRequest {
   partyGstIn?: string;
   partyAddress?: string;
   gstRate?: number;
+  gstMovementType?: 'INTRA_STATE' | 'INTER_STATE';
   notes?: string;
 }
 
@@ -41,6 +43,9 @@ export interface MoneyReceipt {
   id: string;
   receiptNo: string;
   amount: number;
+  receivedAmount?: number;
+  tdsAmount?: number;
+  deductionAmount?: number;
   paymentType: string;
   paymentDate: string;
   paymentMode?: string | null;
@@ -79,6 +84,7 @@ export interface Invoice {
   partyAddress?: string;
   subTotal: number;
   gstRate: number;
+  gstMovementType?: 'INTRA_STATE' | 'INTER_STATE';
   gstAmount: number;
   grandTotal: number;
   status: string;

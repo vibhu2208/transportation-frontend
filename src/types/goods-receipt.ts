@@ -59,6 +59,7 @@ export interface GoodsReceipt {
 
   freight?: string;
   gstPercent?: string;
+  gstMovementType?: 'INTRA_STATE' | 'INTER_STATE';
   basicFreight?: number;
   gstAmount?: number;
   advanceAmount?: number;
@@ -140,6 +141,7 @@ export interface CreateGoodsReceiptDto {
 
   freight?: string;
   gstPercent?: string;
+  gstMovementType?: 'INTRA_STATE' | 'INTER_STATE';
   basicFreight?: number;
   gstAmount?: number;
   advanceAmount?: number;

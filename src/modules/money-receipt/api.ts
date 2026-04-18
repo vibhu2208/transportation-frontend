@@ -6,9 +6,20 @@ import type {
   Bank,
   InvoiceLookupResponse,
   ReceiptMappingRow,
+  MoneyReceiptListItem,
 } from './types';
 
 export const moneyReceiptApi = {
+  async list(params?: { q?: string; limit?: number }): Promise<MoneyReceiptListItem[]> {
+    const response = await api.get('/money-receipt', {
+      params: {
+        q: params?.q,
+        limit: params?.limit,
+      },
+    });
+    return response.data;
+  },
+
   async getInvoiceLines(invoiceId: string): Promise<InvoiceGrLinesResponse> {
     const response = await api.get(`/money-receipt/invoice/${invoiceId}/lines`);
     return response.data;
@@ -20,8 +31,24 @@ export const moneyReceiptApi = {
   },
 
   async create(data: CreateMoneyReceiptPayload) {
-    const response = await api.post('/money-receipt', data);
-    return response.data;
+    try {
+      const response = await api.post('/money-receipt', data);
+      return response.data;
+    } catch (error: any) {
+      const message = String(error?.response?.data?.message || '');
+      const rejectsDeduction =
+        message.includes('deductionAmount should not exist') ||
+        message.includes('lines.0.property deductionAmount should not exist');
+      if (!rejectsDeduction) throw error;
+
+      // Backward compatibility: older backend validators may not yet allow deductionAmount.
+      const fallback = {
+        ...data,
+        lines: data.lines.map(({ deductionAmount: _deductionAmount, ...line }) => line),
+      };
+      const retry = await api.post('/money-receipt', fallback);
+      return retry.data;
+    }
   },
 
   async getOne(id: string) {
@@ -44,8 +71,29 @@ export const moneyReceiptApi = {
     return response.data;
   },
 
+  async createBranch(name: string): Promise<Branch> {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      throw new Error('Branch name is required');
+    }
+    const response = await api.post('/branches', { name: trimmed });
+    return response.data;
+  },
+
   async getBanks(): Promise<Bank[]> {
     const response = await api.get('/banks');
+    return response.data;
+  },
+
+  async createBank(payload: { name: string; accountLast4?: string | null }): Promise<Bank> {
+    const name = payload.name.trim();
+    if (!name) {
+      throw new Error('Bank name is required');
+    }
+    const response = await api.post('/banks', {
+      name,
+      accountLast4: payload.accountLast4 ?? undefined,
+    });
     return response.data;
   },
 

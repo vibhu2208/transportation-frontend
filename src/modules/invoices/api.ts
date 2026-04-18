@@ -71,4 +71,9 @@ export const invoicesApi = {
     });
     return response.data;
   },
+
+  async getMoneyReceiptById(receiptId: string) {
+    const response = await api.get(`/money-receipt/${receiptId}`);
+    return response.data;
+  },
 };

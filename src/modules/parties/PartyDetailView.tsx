@@ -120,7 +120,7 @@ export function PartyDetailView(props: Props) {
   const headerActions = (
     <div className="flex shrink-0 flex-wrap items-center gap-2">
       <Link
-        href={`/admin/dashboard/money-receipts?partyId=${encodeURIComponent(partyId)}`}
+        href={`/admin/dashboard?tab=moneyReceipt&partyId=${encodeURIComponent(partyId)}`}
         className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-white px-3 text-sm font-medium text-emerald-800 shadow-sm hover:bg-emerald-50"
       >
         <IndianRupee className="mr-1.5 h-4 w-4" />
