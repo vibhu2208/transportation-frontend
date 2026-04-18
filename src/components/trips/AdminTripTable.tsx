@@ -121,6 +121,8 @@ interface AdminTripData {
   detentionLoading?: number;
   detentionUL?: number;
   totalExpense?: number;
+  profitLossWithoutDeduction?: number;
+  deductionAmount?: number;
   profitLoss?: number;
   billNo?: string;
   billDate?: string;
@@ -974,11 +976,18 @@ export function AdminTripTable({
         <>
           <div className="md:hidden border-t border-slate-200 px-3 py-3 space-y-2.5 bg-white">
             {filteredTrips.map((trip) => (
-              <button
+              <div
                 key={trip.tripNo}
-                type="button"
+                role="button"
+                tabIndex={0}
                 className="w-full text-left rounded-lg border border-slate-200 p-3 shadow-sm hover:bg-slate-50 active:bg-slate-100 transition-colors"
                 onClick={() => setShowTripModal(trip)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setShowTripModal(trip);
+                  }
+                }}
               >
                 <div className="flex items-start justify-between gap-2">
                   <span className="text-sm font-semibold text-slate-900">{compactTripNoForTable(trip.tripNo)}</span>
@@ -1024,7 +1033,7 @@ export function AdminTripTable({
                     {hasGrDetails(trip) ? 'View GR details' : 'Add GR details'}
                   </button>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
 
@@ -1334,11 +1343,12 @@ export function AdminTripTable({
                       {headerCanInvoice && (
                         <button
                           type="button"
-                          onClick={() =>
-                            router.push(
-                              `/admin/dashboard/invoices${showTripModal.partyId ? `?partyId=${encodeURIComponent(showTripModal.partyId)}` : ''}`,
-                            )
-                          }
+                          onClick={() => {
+                            const q = new URLSearchParams();
+                            q.set('tab', 'invoices');
+                            if (showTripModal.partyId) q.set('partyId', showTripModal.partyId);
+                            router.push(`/admin/dashboard?${q.toString()}`);
+                          }}
                           className="inline-flex items-center justify-center rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-violet-700"
                         >
                           Go to invoicing
@@ -1471,7 +1481,9 @@ export function AdminTripTable({
                       (latestGr?.detentionLoading != null ? parseGrAmount((latestGr as any).detentionLoading) : showTripModal.detentionLoading ?? 0) +
                       (latestGr?.detentionUL != null ? parseGrAmount((latestGr as any).detentionUL) : showTripModal.detentionUL ?? 0) +
                       sumManualExpenseRows((latestGr as any)?.expenses);
-                    const profitLoss = effectiveFreight - totalExpense;
+                    const profitLossWithoutDeduction = effectiveFreight - totalExpense;
+                    const deductionAmount = showTripModal.deductionAmount ?? 0;
+                    const profitLossWithDeduction = profitLossWithoutDeduction - deductionAmount;
                     return (
                       <>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -1490,6 +1502,12 @@ export function AdminTripTable({
                         }`}>
                           {formatCurrency(showTripModal.advance ?? 0)}
                         </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600">Deduction</label>
+                      <div className="mt-1.5 rounded-lg border border-slate-200/90 bg-slate-50 px-3 py-2 text-sm tabular-nums text-slate-900">
+                        {formatCurrency(showTripModal.deductionAmount ?? 0)}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600">Expense</label>
@@ -1629,11 +1647,25 @@ export function AdminTripTable({
                       </p>
                     </div>
                     <div className="rounded-lg border border-slate-200/80 bg-white/90 p-4 shadow-sm">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">P&amp;L</span>
-                      <p className={`mt-2 text-2xl font-semibold tabular-nums tracking-tight ${getProfitLossColor(profitLoss)}`}>
-                        {formatCurrency(profitLoss)}
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">P&amp;L (with deduction)</span>
+                      <p className={`mt-2 text-2xl font-semibold tabular-nums tracking-tight ${getProfitLossColor(profitLossWithDeduction)}`}>
+                        {formatCurrency(profitLossWithDeduction)}
                       </p>
-                      <p className="mt-2 text-xs text-slate-500">Freight minus the same live total expense shown at left.</p>
+                      <p className="mt-2 text-xs text-slate-500">
+                        Freight - expense - deduction. (Deduction defaults to 0 when none exists.)
+                      </p>
+                      <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-600">
+                        <div className="flex items-center justify-between rounded border border-slate-200 bg-slate-50 px-2 py-1.5">
+                          <span>P&amp;L without deduction</span>
+                          <span className={`tabular-nums ${getProfitLossColor(profitLossWithoutDeduction)}`}>
+                            {formatCurrency(profitLossWithoutDeduction)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between rounded border border-slate-200 bg-slate-50 px-2 py-1.5">
+                          <span>Deduction used</span>
+                          <span className="tabular-nums text-slate-900">{formatCurrency(deductionAmount)}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                       </>
@@ -1700,11 +1732,12 @@ export function AdminTripTable({
                           </button>
                           <button
                             type="button"
-                            onClick={() =>
-                              router.push(
-                                `/admin/dashboard/money-receipts${showTripModal.partyId ? `?partyId=${encodeURIComponent(showTripModal.partyId)}` : ''}`,
-                              )
-                            }
+                            onClick={() => {
+                              const q = new URLSearchParams();
+                              q.set('tab', 'moneyReceipt');
+                              if (showTripModal.partyId) q.set('partyId', showTripModal.partyId);
+                              router.push(`/admin/dashboard?${q.toString()}`);
+                            }}
                             className="inline-flex w-full items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 sm:w-auto"
                           >
                             Go to MR

@@ -11,6 +11,8 @@ import ImageUpload from '@/components/ui/ImageUpload';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { partiesApi } from '@/modules/parties/api';
+import { GR_INVOICE_UI_UNLOCK_PASSCODE } from '@/lib/gr-invoice-ui-lock';
+import { GrInvoiceUnlockOverlay } from '@/components/trips/GrInvoiceUnlockOverlay';
 
 interface GREditModalProps {
   trip: any;
@@ -210,8 +212,19 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
     cnType: false,
     deliveryAt: false,
   });
+  const [gstMovementType, setGstMovementType] = useState<'INTRA_STATE' | 'INTER_STATE'>('INTRA_STATE');
   const branchBoxRef = useRef<HTMLDivElement | null>(null);
   const isEditing = !!existingGR;
+
+  const tripInvoiced = Boolean(trip?.invoiceId);
+  const [invoiceLockPasscode, setInvoiceLockPasscode] = useState('');
+  const [invoiceLockUnlocked, setInvoiceLockUnlocked] = useState(false);
+  const formLockedByInvoice = tripInvoiced && !invoiceLockUnlocked;
+
+  useEffect(() => {
+    setInvoiceLockUnlocked(false);
+    setInvoiceLockPasscode('');
+  }, [trip?.id, trip?.invoiceId]);
 
   const defaultValues = useMemo<Partial<GRData>>(() => {
     if (existingGR) {
@@ -351,6 +364,16 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
     setValue('totalFreight', totalFreightValue);
     setValue('netPayable', netPayableValue);
   }, [gstAmountValue, totalFreightValue, netPayableValue, setValue]);
+
+  useEffect(() => {
+    setValue('gstPercent', '18', { shouldDirty: true, shouldValidate: true });
+  }, [gstMovementType, setValue]);
+
+  useEffect(() => {
+    if (existingGR?.gstMovementType === 'INTER_STATE' || existingGR?.gstMovementType === 'INTRA_STATE') {
+      setGstMovementType(existingGR.gstMovementType);
+    }
+  }, [existingGR?.id, existingGR?.gstMovementType]);
 
   useEffect(() => {
     const loadBranches = async () => {
@@ -726,6 +749,10 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
   };
 
   const onSubmit = async (data: GRData) => {
+    if (formLockedByInvoice) {
+      toast.error('This trip is invoiced. Unlock with the passcode dialog to edit the GR.');
+      return;
+    }
     setIsLoading(true);
     try {
       const token = localStorage.getItem('auth_token');
@@ -794,6 +821,7 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
         advanceDate: data.advanceDate,
         totalFreight: totalFreightValue,
         netPayable: netPayableValue,
+        gstMovementType,
         gstPaidBy: data.gstPaidBy,
         partyBillNo: data.partyBillNo,
         acType: data.acType,
@@ -858,6 +886,10 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
   };
 
   const handleUploadPOD = async () => {
+    if (formLockedByInvoice) {
+      toast.error('This trip is invoiced. Unlock with the passcode dialog to change the GR or POD.');
+      return;
+    }
     if (!existingGR?.id) {
       toast.error('Save GR first, then upload POD.');
       return;
@@ -910,6 +942,10 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
   };
 
   const submitGrForm = () => {
+    if (formLockedByInvoice) {
+      toast.error('This trip is invoiced. Unlock with the passcode dialog to edit the GR.');
+      return;
+    }
     if (isEditing) {
       void onSubmit(getValues());
       return;
@@ -937,18 +973,35 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {tripInvoiced && invoiceLockUnlocked && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 ring-1 ring-emerald-200/90">
+                  <svg className="h-3.5 w-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                  </svg>
+                  Editing unlocked
+                </span>
+              )}
               <Button type="button" variant="outline" onClick={onCancel}>
                 Save Draft
               </Button>
-              <Button type="button" onClick={submitGrForm} disabled={isLoading}>
+              <Button type="button" onClick={submitGrForm} disabled={isLoading || formLockedByInvoice}>
                 {isLoading ? 'Saving...' : 'Submit'}
               </Button>
             </div>
           </div>
         </div>
 
-        <form id="gr-form" noValidate onSubmit={(e) => e.preventDefault()} className="flex-1 space-y-2.5 overflow-y-auto p-2.5 sm:p-3.5">
+        <form
+          id="gr-form"
+          noValidate
+          onSubmit={(e) => e.preventDefault()}
+          className="flex min-h-0 flex-1 flex-col p-0"
+        >
+          <fieldset
+            disabled={formLockedByInvoice}
+            className="m-0 flex min-h-0 flex-1 flex-col space-y-2.5 overflow-y-auto border-0 p-2.5 sm:p-3.5"
+          >
           <section className={sectionPanelClass}>
             <h4 className={sectionTitleClass}>Primary Details</h4>
             <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
@@ -1295,14 +1348,21 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
                     <Input type="number" min="0" step="0.01" {...register('basicFreight')} placeholder="Enter Basic Freight" />
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">GST %</label>
-                    <select {...register('gstPercent')} className="w-full rounded border border-slate-300 px-3 py-2 text-sm">
-                      <option value="">Select GST %</option>
-                      <option value="0">0</option>
-                      <option value="5">5</option>
-                      <option value="12">12</option>
-                      <option value="18">18</option>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">GST movement</label>
+                    <select
+                      value={gstMovementType}
+                      onChange={(e) => setGstMovementType(e.target.value as 'INTRA_STATE' | 'INTER_STATE')}
+                      className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                    >
+                      <option value="INTRA_STATE">Intra-State (Within Same State)</option>
+                      <option value="INTER_STATE">Inter-State (Between States)</option>
                     </select>
+                    <input type="hidden" {...register('gstPercent')} />
+                    <p className="mt-1 text-xs text-slate-500">
+                      {gstMovementType === 'INTRA_STATE'
+                        ? 'CGST 9% + SGST 9% (Total GST 18%)'
+                        : 'IGST 18% (Total GST 18%)'}
+                    </p>
                   </div>
                   <div className="flex items-center justify-between rounded bg-white px-3 py-2 text-sm">
                     <span className="text-slate-600">GST Amount</span>
@@ -1381,7 +1441,7 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
                   <Button
                     type="button"
                     onClick={handleUploadPOD}
-                    disabled={isUploadingPOD || podImages.length === 0}
+                    disabled={formLockedByInvoice || isUploadingPOD || podImages.length === 0}
                   >
                     {isUploadingPOD ? 'Uploading...' : 'Upload POD'}
                   </Button>
@@ -1402,17 +1462,39 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
               <div className="md:col-span-3"><label className={fieldLabelClass}>Remarks</label><Input {...register('remarks')} placeholder="Remarks" /></div>
             </div>
           </section>
+          </fieldset>
         </form>
 
         <div className="sticky bottom-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-            <Button type="button" onClick={submitGrForm} disabled={isLoading}>
+            <Button type="button" onClick={submitGrForm} disabled={isLoading || formLockedByInvoice}>
               {isLoading ? 'Saving...' : isEditing ? 'Update GR' : 'Add GR'}
             </Button>
           </div>
         </div>
       </div>
+
+      <GrInvoiceUnlockOverlay
+        open={tripInvoiced && !invoiceLockUnlocked}
+        passcode={invoiceLockPasscode}
+        onPasscodeChange={setInvoiceLockPasscode}
+        onUnlock={() => {
+          if (invoiceLockPasscode.trim() === GR_INVOICE_UI_UNLOCK_PASSCODE) {
+            setInvoiceLockUnlocked(true);
+            setInvoiceLockPasscode('');
+            toast.success('GR editing unlocked');
+          } else {
+            toast.error('Incorrect passcode');
+          }
+        }}
+        onCancel={() => {
+          if (onBack) onBack();
+          else onCancel();
+        }}
+        unlockButtonLabel="Unlock editing"
+        cancelButtonLabel={onBack ? 'Go back' : 'Close'}
+      />
     </div>
   );
 }

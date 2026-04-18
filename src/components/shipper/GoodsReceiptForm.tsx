@@ -1,11 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import ImageUpload from '@/components/ui/ImageUpload';
 import { goodsReceiptApi } from '@/lib/api-client';
 import type { CreateGoodsReceiptDto } from '@/types/goods-receipt';
+import { GR_INVOICE_UI_UNLOCK_PASSCODE } from '@/lib/gr-invoice-ui-lock';
+import { GrInvoiceUnlockOverlay } from '@/components/trips/GrInvoiceUnlockOverlay';
 
 interface Trip {
   id: string;
@@ -17,11 +20,15 @@ interface Trip {
   freight?: number | null;
   ewayBillNumber?: string | null;
   ewayDate?: string | null;
+  /** When set, GR form is UI-locked until passcode is entered */
+  invoiceId?: string | null;
 }
 
 interface Props {
   trip: Trip;
   onComplete: () => void;
+  /** Called when user leaves the unlock dialog without entering the passcode (optional) */
+  onCancel?: () => void;
 }
 
 /** UI-only e-way fields; submitted as `tripEwaySync`, not as GR columns. */
@@ -57,8 +64,18 @@ const toEwayDateInput = (value: string | null | undefined): string => {
   return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : '';
 };
 
-export default function GoodsReceiptForm({ trip, onComplete }: Props) {
+export default function GoodsReceiptForm({ trip, onComplete, onCancel }: Props) {
   const draftStorageKey = useMemo(() => `gr_draft_goods_receipt_form_${trip.id}`, [trip.id]);
+  const tripInvoiced = Boolean(trip.invoiceId);
+  const [invoiceLockPasscode, setInvoiceLockPasscode] = useState('');
+  const [invoiceLockUnlocked, setInvoiceLockUnlocked] = useState(false);
+  const formLockedByInvoice = tripInvoiced && !invoiceLockUnlocked;
+
+  useEffect(() => {
+    setInvoiceLockUnlocked(false);
+    setInvoiceLockPasscode('');
+  }, [trip.id, trip.invoiceId]);
+
   const [loading, setLoading] = useState(false);
   const [grBiltyImages, setGrBiltyImages] = useState<string[]>([]);
   const [formData, setFormData] = useState<GoodsReceiptFormState>({
@@ -120,6 +137,11 @@ export default function GoodsReceiptForm({ trip, onComplete }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (formLockedByInvoice) {
+      toast.error('This trip is invoiced. Unlock with the passcode dialog to submit a GR.');
+      return;
+    }
+
     const userData = localStorage.getItem('user_data');
     const user = userData ? JSON.parse(userData) : null;
 
@@ -156,10 +178,40 @@ export default function GoodsReceiptForm({ trip, onComplete }: Props) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg shadow">
-      <h2 className="text-2xl font-bold mb-6">Goods Receipt Form</h2>
-      <p className="text-sm text-gray-600 -mt-4 mb-2">Trip prefill is optional. All fields are editable.</p>
+    <>
+      <GrInvoiceUnlockOverlay
+        open={tripInvoiced && !invoiceLockUnlocked}
+        passcode={invoiceLockPasscode}
+        onPasscodeChange={setInvoiceLockPasscode}
+        onUnlock={() => {
+          if (invoiceLockPasscode.trim() === GR_INVOICE_UI_UNLOCK_PASSCODE) {
+            setInvoiceLockUnlocked(true);
+            setInvoiceLockPasscode('');
+            toast.success('GR entry unlocked');
+          } else {
+            toast.error('Incorrect passcode');
+          }
+        }}
+        onCancel={() => onCancel?.()}
+        unlockButtonLabel="Unlock form"
+        cancelButtonLabel="Cancel"
+        subtitle="This trip already has an invoice. Enter the passcode to fill and submit this goods receipt."
+      />
 
+      <form onSubmit={handleSubmit} className="relative space-y-6 rounded-lg bg-white p-6 shadow">
+        <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-bold">Goods Receipt Form</h2>
+          <p className="mt-1 text-sm text-gray-600">Trip prefill is optional. All fields are editable.</p>
+        </div>
+        {tripInvoiced && invoiceLockUnlocked && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 ring-1 ring-emerald-200/90">
+            Editing unlocked
+          </span>
+        )}
+        </div>
+
+        <fieldset disabled={formLockedByInvoice} className="m-0 space-y-6 border-0 p-0">
       <section className="space-y-4">
         <h3 className="text-lg font-semibold border-b pb-2">Consignment</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -496,10 +548,12 @@ export default function GoodsReceiptForm({ trip, onComplete }: Props) {
       </section>
 
       <div className="flex gap-4 pt-6">
-        <Button type="submit" disabled={loading} className="flex-1">
+        <Button type="submit" disabled={loading || formLockedByInvoice} className="flex-1">
           {loading ? 'Submitting...' : 'Submit Goods Receipt'}
         </Button>
       </div>
+      </fieldset>
     </form>
+    </>
   );
 }
