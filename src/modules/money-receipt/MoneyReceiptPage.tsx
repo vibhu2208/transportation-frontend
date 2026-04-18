@@ -25,9 +25,11 @@ import {
   WalletCards,
   RefreshCw,
   Download,
+  Eye,
   Search,
   X,
 } from 'lucide-react';
+import { openPdfBlobInNewTab } from '@/lib/pdf-preview';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -261,6 +263,20 @@ export default function MoneyReceiptPage() {
       URL.revokeObjectURL(url);
     } catch {
       setError('Could not download PDF');
+    } finally {
+      setDownloadingPdfId(null);
+    }
+  };
+
+  const handlePreviewRowPdf = async (id: string) => {
+    setDownloadingPdfId(id);
+    try {
+      const blob = await moneyReceiptApi.downloadPdf(id);
+      if (!openPdfBlobInNewTab(blob)) {
+        setError('Pop-up blocked. Allow pop-ups to preview the PDF.');
+      }
+    } catch {
+      setError('Could not preview PDF');
     } finally {
       setDownloadingPdfId(null);
     }
@@ -792,18 +808,18 @@ export default function MoneyReceiptPage() {
                   No invoice lines yet. Use <strong>Add invoice line</strong> above, then they appear here.
                 </div>
               ) : (
-                <table className="w-full min-w-[1040px] text-sm">
-                  <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-100/95 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 backdrop-blur">
+                <table className="w-full min-w-0 table-fixed border-collapse text-[11px] sm:text-sm">
+                  <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-100/95 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-600 backdrop-blur sm:text-xs">
                     <tr>
-                      <th className="px-3 py-2.5">Invoice no.</th>
-                      <th className="px-3 py-2.5">MR no.</th>
-                      <th className="px-3 py-2.5">GR no.</th>
-                      <th className="px-3 py-2.5 text-right">Inv. amount</th>
-                      <th className="px-3 py-2.5 text-right">Outstanding</th>
-                      <th className="px-3 py-2.5 text-right">Received</th>
-                      <th className="px-3 py-2.5 text-right">TDS</th>
-                      <th className="px-3 py-2.5 text-right">Deduction</th>
-                      <th className="w-10 px-2 py-2.5" />
+                      <th className="w-[14%] px-1.5 py-2 sm:px-2.5">Invoice no.</th>
+                      <th className="w-[11%] px-1.5 py-2 sm:px-2.5">MR no.</th>
+                      <th className="w-[12%] px-1.5 py-2 sm:px-2.5">GR no.</th>
+                      <th className="w-[11%] px-1.5 py-2 text-right sm:px-2.5">Inv. amt</th>
+                      <th className="w-[11%] px-1.5 py-2 text-right sm:px-2.5">Outstd.</th>
+                      <th className="w-[13%] px-1.5 py-2 text-right sm:px-2.5">Received</th>
+                      <th className="w-[10%] px-1.5 py-2 text-right sm:px-2.5">TDS</th>
+                      <th className="w-[10%] px-1.5 py-2 text-right sm:px-2.5">Deduct.</th>
+                      <th className="w-[8%] px-1 py-2 sm:px-2" />
                     </tr>
                   </thead>
                   <tbody>
@@ -817,49 +833,49 @@ export default function MoneyReceiptPage() {
                       const mrDisp = invoiceMrDisplay(inv);
                       return (
                         <tr key={inv.id} className="border-b border-slate-100 bg-white hover:bg-slate-50/80">
-                          <td className="px-3 py-2 align-middle">
-                            <div className="font-mono text-xs font-medium text-slate-900">{inv.invoiceNo}</div>
+                          <td className="max-w-0 px-1.5 py-2 align-middle sm:px-2.5">
+                            <div className="truncate font-mono text-[11px] font-medium text-slate-900 sm:text-xs">{inv.invoiceNo}</div>
                             {lineRemarks[inv.id] ? (
-                              <div className="mt-0.5 text-[10px] text-slate-500">{lineRemarks[inv.id]}</div>
+                              <div className="mt-0.5 truncate text-[9px] text-slate-500 sm:text-[10px]">{lineRemarks[inv.id]}</div>
                             ) : null}
                           </td>
-                          <td className="max-w-[120px] truncate px-3 py-2 align-middle font-mono text-xs text-slate-800" title={mrDisp}>
+                          <td className="max-w-0 truncate px-1.5 py-2 align-middle font-mono text-[10px] text-slate-800 sm:px-2.5 sm:text-xs" title={mrDisp}>
                             {mrDisp}
                           </td>
-                          <td className="max-w-[140px] truncate px-3 py-2 align-middle font-mono text-xs text-slate-700" title={grDisp}>
+                          <td className="max-w-0 truncate px-1.5 py-2 align-middle font-mono text-[10px] text-slate-700 sm:px-2.5 sm:text-xs" title={grDisp}>
                             {grDisp}
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-slate-700">
+                          <td className="max-w-0 truncate px-1.5 py-2 text-right align-middle text-[10px] tabular-nums text-slate-700 sm:px-2.5 sm:text-sm">
                             ₹{(inv.grandTotal ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-amber-900">
+                          <td className="max-w-0 truncate px-1.5 py-2 text-right align-middle text-[10px] tabular-nums text-amber-900 sm:px-2.5 sm:text-sm">
                             ₹{rem.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </td>
-                          <td className="px-2 py-1 align-middle">
+                          <td className="min-w-0 px-1 py-1 align-middle sm:px-2">
                             <Input
                               type="number"
                               min={0}
                               step={0.01}
-                              className="h-8 text-right text-xs tabular-nums"
+                              className="h-7 w-full min-w-0 text-right text-[11px] tabular-nums sm:h-8 sm:text-xs"
                               value={v.received}
                               onChange={(e) => updateAmount(inv.id, 'received', e.target.value)}
                             />
                           </td>
-                          <td className="px-2 py-1 align-middle">
+                          <td className="min-w-0 px-1 py-1 align-middle sm:px-2">
                             <Input
                               readOnly
-                              className="h-8 text-right text-xs tabular-nums bg-slate-100"
+                              className="h-7 w-full min-w-0 text-right text-[11px] tabular-nums bg-slate-100 sm:h-8 sm:text-xs"
                               value={t.toFixed(2)}
                             />
                           </td>
-                          <td className="px-2 py-1 align-middle">
+                          <td className="min-w-0 px-1 py-1 align-middle sm:px-2">
                             <Input
                               readOnly
-                              className="h-8 text-right text-xs tabular-nums bg-slate-100"
+                              className="h-7 w-full min-w-0 text-right text-[11px] tabular-nums bg-slate-100 sm:h-8 sm:text-xs"
                               value={ded.toFixed(2)}
                             />
                           </td>
-                          <td className="px-1 py-1 align-middle">
+                          <td className="px-0.5 py-1 align-middle sm:px-1">
                             <Button
                               type="button"
                               variant="ghost"
@@ -910,25 +926,25 @@ export default function MoneyReceiptPage() {
                 {!partyId ? <span className="text-xs text-slate-500">Select a party first</span> : null}
               </div>
               {mapping && mapping.length > 0 ? (
-                <div className="overflow-x-auto rounded-lg border border-slate-200">
-                  <table className="w-full min-w-[520px] text-left text-xs">
+                <div className="rounded-lg border border-slate-200">
+                  <table className="w-full min-w-0 table-fixed border-collapse text-left text-[11px] sm:text-xs">
                     <thead className="bg-slate-50 text-slate-600">
                       <tr>
-                        <th className="px-2 py-2">Trip no.</th>
-                        <th className="px-2 py-2">GR no.</th>
-                        <th className="px-2 py-2">Invoice no.</th>
-                        <th className="px-2 py-2">MR no.</th>
-                        <th className="px-2 py-2 text-right">Deduction</th>
+                        <th className="w-[20%] px-2 py-2">Trip no.</th>
+                        <th className="w-[20%] px-2 py-2">GR no.</th>
+                        <th className="w-[20%] px-2 py-2">Invoice no.</th>
+                        <th className="w-[22%] px-2 py-2">MR no.</th>
+                        <th className="w-[18%] px-2 py-2 text-right">Deduction</th>
                       </tr>
                     </thead>
                     <tbody>
                       {mapping.map((row, idx) => (
                         <tr key={`${row.receiptNo}-${idx}`} className="border-t border-slate-100">
-                          <td className="px-2 py-1.5 font-mono">{row.tripNo}</td>
-                          <td className="px-2 py-1.5 font-mono">{row.grNo}</td>
-                          <td className="px-2 py-1.5 font-mono">{row.invoiceNo}</td>
-                          <td className="px-2 py-1.5 font-mono">{row.receiptNo}</td>
-                          <td className="px-2 py-1.5 text-right tabular-nums">
+                          <td className="max-w-0 truncate px-2 py-1.5 font-mono text-[11px]" title={row.tripNo}>{row.tripNo}</td>
+                          <td className="max-w-0 truncate px-2 py-1.5 font-mono text-[11px]" title={row.grNo}>{row.grNo}</td>
+                          <td className="max-w-0 truncate px-2 py-1.5 font-mono text-[11px]" title={row.invoiceNo}>{row.invoiceNo}</td>
+                          <td className="max-w-0 truncate px-2 py-1.5 font-mono text-[11px]" title={row.receiptNo}>{row.receiptNo}</td>
+                          <td className="max-w-0 truncate px-2 py-1.5 text-right text-[11px] tabular-nums">
                             ₹{(row.deductionAmount ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </td>
                         </tr>
@@ -1036,21 +1052,21 @@ export default function MoneyReceiptPage() {
                 {mrListRows.length === 0 ? 'No money receipts yet.' : 'No receipts match your search.'}
               </p>
             ) : (
-              <div className="table-scroll-bleed overflow-x-auto border-t border-slate-200">
-                <table className="min-w-[1080px] w-full text-sm">
+              <div className="table-scroll-bleed border-t border-slate-200">
+                <table className="w-full min-w-0 table-fixed border-collapse text-[11px] sm:text-sm">
                   <thead className="sticky top-0 z-10 bg-slate-50">
                     <tr className="border-b border-slate-200 text-left">
-                      <th className="px-3 py-2 font-semibold text-slate-700">Receipt no.</th>
-                      <th className="px-3 py-2 font-semibold text-slate-700">Date</th>
-                      <th className="px-3 py-2 font-semibold text-slate-700">Party</th>
-                      <th className="px-3 py-2 font-semibold text-slate-700">Invoice no.</th>
-                      <th className="px-3 py-2 font-semibold text-slate-700">GR no.</th>
-                      <th className="px-3 py-2 font-semibold text-slate-700">Mode</th>
-                      <th className="px-3 py-2 font-semibold text-slate-700">Reference</th>
-                      <th className="px-3 py-2 text-right font-semibold text-slate-700">Amount</th>
-                      <th className="px-3 py-2 text-right font-semibold text-slate-700">Lines</th>
-                      <th className="px-3 py-2 font-semibold text-slate-700">Status</th>
-                      <th className="px-3 py-2 text-right font-semibold text-slate-700">Actions</th>
+                      <th className="w-[8%] px-1.5 py-2 font-semibold text-slate-700 sm:px-2.5">Receipt</th>
+                      <th className="w-[6%] px-1.5 py-2 font-semibold text-slate-700 sm:px-2.5">Date</th>
+                      <th className="w-[12%] px-1.5 py-2 font-semibold text-slate-700 sm:px-2.5">Party</th>
+                      <th className="w-[10%] px-1.5 py-2 font-semibold text-slate-700 sm:px-2.5">Invoice</th>
+                      <th className="w-[8%] px-1.5 py-2 font-semibold text-slate-700 sm:px-2.5">GR</th>
+                      <th className="w-[6%] px-1.5 py-2 font-semibold text-slate-700 sm:px-2.5">Mode</th>
+                      <th className="w-[6%] px-1.5 py-2 font-semibold text-slate-700 sm:px-2.5">Ref.</th>
+                      <th className="w-[9%] px-1.5 py-2 text-right font-semibold text-slate-700 sm:px-2.5">Amount</th>
+                      <th className="w-[5%] px-1.5 py-2 text-right font-semibold text-slate-700 sm:px-2.5">Lines</th>
+                      <th className="w-[7%] px-1.5 py-2 font-semibold text-slate-700 sm:px-2.5">Status</th>
+                      <th className="w-[13%] px-1.5 py-2 text-right font-semibold text-slate-700 sm:px-2.5">PDF</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
@@ -1060,55 +1076,75 @@ export default function MoneyReceiptPage() {
                         className="cursor-pointer hover:bg-slate-50/70"
                         onClick={() => openMrDetail(row.id)}
                       >
-                        <td className="px-3 py-2.5 font-mono font-semibold text-slate-900">{row.receiptNo}</td>
-                        <td className="px-3 py-2.5 text-slate-700">
+                        <td className="max-w-0 truncate px-1.5 py-2 align-top font-mono text-[10px] font-semibold text-slate-900 sm:px-2.5 sm:py-2.5 sm:text-xs">
+                          {row.receiptNo}
+                        </td>
+                        <td className="max-w-0 truncate px-1.5 py-2 align-top text-[10px] text-slate-700 sm:px-2.5 sm:py-2.5 sm:text-sm">
                           {new Date(row.receiptDate).toLocaleDateString('en-IN')}
                         </td>
-                        <td className="max-w-[220px] truncate px-3 py-2.5 text-slate-800" title={row.partyName}>
+                        <td className="max-w-0 truncate px-1.5 py-2 align-top text-[10px] text-slate-800 sm:px-2.5 sm:py-2.5 sm:text-sm" title={row.partyName}>
                           {row.partyName}
                         </td>
                         <td
-                          className="max-w-[200px] truncate px-3 py-2.5 font-mono text-xs text-slate-800"
+                          className="max-w-0 truncate px-1.5 py-2 align-top font-mono text-[10px] text-slate-800 sm:px-2.5 sm:py-2.5 sm:text-xs"
                           title={row.invoiceNosSummary ?? ''}
                         >
                           {row.invoiceNosSummary ?? '—'}
                         </td>
                         <td
-                          className="max-w-[180px] truncate px-3 py-2.5 font-mono text-xs text-slate-800"
+                          className="max-w-0 truncate px-1.5 py-2 align-top font-mono text-[10px] text-slate-800 sm:px-2.5 sm:py-2.5 sm:text-xs"
                           title={row.grNosSummary ?? ''}
                         >
                           {row.grNosSummary ?? '—'}
                         </td>
-                        <td className="px-3 py-2.5 text-slate-700">{row.paymentMode}</td>
-                        <td className="max-w-[140px] truncate px-3 py-2.5 font-mono text-xs text-slate-600">
+                        <td className="max-w-0 truncate px-1.5 py-2 align-top text-[10px] text-slate-700 sm:px-2.5 sm:py-2.5 sm:text-sm">{row.paymentMode}</td>
+                        <td className="max-w-0 truncate px-1.5 py-2 align-top font-mono text-[10px] text-slate-600 sm:px-2.5 sm:py-2.5 sm:text-xs">
                           {row.referenceNo ?? '—'}
                         </td>
-                        <td className="px-3 py-2.5 text-right tabular-nums text-slate-800">
+                        <td className="max-w-0 truncate px-1.5 py-2 text-right align-top text-[10px] tabular-nums text-slate-800 sm:px-2.5 sm:py-2.5 sm:text-sm">
                           ₹{row.totalReceived.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </td>
-                        <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">
+                        <td className="px-1.5 py-2 text-center align-top text-[10px] tabular-nums text-slate-700 sm:px-2.5 sm:py-2.5 sm:text-sm">
                           {row.allocationCount}
                         </td>
-                        <td className="px-3 py-2.5">
-                          <Badge variant="secondary" className="rounded-md text-xs">
+                        <td className="px-1.5 py-2 align-top sm:px-2.5 sm:py-2.5">
+                          <Badge variant="secondary" className="rounded-md px-1 py-0 text-[9px] sm:px-2 sm:text-xs">
                             {row.status}
                           </Badge>
                         </td>
-                        <td className="px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-8 rounded-md px-2.5"
-                            disabled={downloadingPdfId === row.id}
-                            onClick={() => handleDownloadRowPdf(row.id, row.receiptNo)}
-                          >
-                            {downloadingPdfId === row.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Download className="h-4 w-4" />
-                            )}
-                          </Button>
+                        <td className="px-1.5 py-2 text-right align-top sm:px-2.5 sm:py-2.5" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex justify-end gap-0.5 sm:gap-1">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 rounded-md px-2.5"
+                              title="Preview PDF"
+                              disabled={downloadingPdfId === row.id}
+                              onClick={() => handlePreviewRowPdf(row.id)}
+                            >
+                              {downloadingPdfId === row.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 rounded-md px-2.5"
+                              title="Download PDF"
+                              disabled={downloadingPdfId === row.id}
+                              onClick={() => handleDownloadRowPdf(row.id, row.receiptNo)}
+                            >
+                              {downloadingPdfId === row.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Download className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1233,15 +1269,15 @@ export default function MoneyReceiptPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="overflow-x-auto rounded-lg border border-slate-200">
-                    <table className="w-full min-w-[720px] text-sm">
-                      <thead className="bg-slate-50 text-left text-xs">
+                  <div className="rounded-lg border border-slate-200">
+                    <table className="w-full min-w-0 table-fixed border-collapse text-[11px] sm:text-sm">
+                      <thead className="bg-slate-50 text-left text-[10px] sm:text-xs">
                         <tr>
-                          <th className="px-3 py-2 font-medium text-slate-700">Invoice no.</th>
-                          <th className="px-3 py-2 font-medium text-slate-700">GR no.</th>
-                          <th className="px-3 py-2 text-right font-medium text-slate-700">Received</th>
-                          <th className="px-3 py-2 text-right font-medium text-slate-700">TDS</th>
-                          <th className="px-3 py-2 text-right font-medium text-slate-700">Deduction</th>
+                          <th className="w-[22%] px-2 py-2 font-medium text-slate-700 sm:px-3">Invoice no.</th>
+                          <th className="w-[28%] px-2 py-2 font-medium text-slate-700 sm:px-3">GR no.</th>
+                          <th className="w-[17%] px-2 py-2 text-right font-medium text-slate-700 sm:px-3">Received</th>
+                          <th className="w-[16%] px-2 py-2 text-right font-medium text-slate-700 sm:px-3">TDS</th>
+                          <th className="w-[17%] px-2 py-2 text-right font-medium text-slate-700 sm:px-3">Deduction</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -1258,19 +1294,19 @@ export default function MoneyReceiptPage() {
                             const grCell = a.grNoDisplay ?? a.goodsReceipt?.grNo ?? '—';
                             return (
                           <tr key={a.id}>
-                            <td className="px-3 py-2 font-mono text-xs">
+                            <td className="max-w-0 truncate px-2 py-2 font-mono text-[10px] sm:px-3 sm:text-xs">
                               {a.invoice?.invoiceNo ?? '—'}
                             </td>
-                            <td className="max-w-[200px] truncate px-3 py-2 font-mono text-xs text-slate-800" title={grCell}>
+                            <td className="max-w-0 truncate px-2 py-2 font-mono text-[10px] text-slate-800 sm:px-3 sm:text-xs" title={grCell}>
                               {grCell}
                             </td>
-                            <td className="px-3 py-2 text-right tabular-nums">
+                            <td className="max-w-0 truncate px-2 py-2 text-right text-[10px] tabular-nums sm:px-3 sm:text-sm">
                               ₹{a.receivedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </td>
-                            <td className="px-3 py-2 text-right tabular-nums">
+                            <td className="max-w-0 truncate px-2 py-2 text-right text-[10px] tabular-nums sm:px-3 sm:text-sm">
                               ₹{a.tdsAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </td>
-                            <td className="px-3 py-2 text-right tabular-nums">
+                            <td className="max-w-0 truncate px-2 py-2 text-right text-[10px] tabular-nums sm:px-3 sm:text-sm">
                               ₹{a.deduction.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </td>
                           </tr>
@@ -1279,7 +1315,21 @@ export default function MoneyReceiptPage() {
                       </tbody>
                     </table>
                   </div>
-                  <div className="flex justify-end">
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="gap-2"
+                      disabled={downloadingPdfId === selectedMrDetail.id}
+                      onClick={() => handlePreviewRowPdf(selectedMrDetail.id)}
+                    >
+                      {downloadingPdfId === selectedMrDetail.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Eye className="mr-2 h-4 w-4" />
+                      )}
+                      Preview PDF
+                    </Button>
                     <Button
                       type="button"
                       variant="outline"

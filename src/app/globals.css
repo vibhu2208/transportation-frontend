@@ -123,8 +123,8 @@
     padding-right: max(0.5rem, env(safe-area-inset-right));
   }
 
-  /* Horizontal scroll for data tables on small screens (touch-friendly) */
+  /* Wide tables: scroll inside this container only (no negative margins — those caused page-level horizontal overflow). */
   .table-scroll-bleed {
-    @apply -mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto;
+    @apply w-full max-w-full min-w-0 overflow-x-auto overscroll-x-contain;
   }
 }
