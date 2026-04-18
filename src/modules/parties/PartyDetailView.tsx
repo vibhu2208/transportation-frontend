@@ -50,6 +50,7 @@ export function PartyDetailView(props: Props) {
   const [branchFormError, setBranchFormError] = useState<string | null>(null);
   const [newBranchLedger, setNewBranchLedger] = useState('');
   const [newBranchLocation, setNewBranchLocation] = useState('');
+  const [newBranchGstIn, setNewBranchGstIn] = useState('');
   const [newBranchAddress, setNewBranchAddress] = useState('');
 
   useEffect(() => {
@@ -76,6 +77,7 @@ export function PartyDetailView(props: Props) {
     if (!branchFormOpen) {
       setNewBranchLedger('');
       setNewBranchLocation('');
+      setNewBranchGstIn('');
       setNewBranchAddress('');
       setBranchFormError(null);
     }
@@ -102,6 +104,7 @@ export function PartyDetailView(props: Props) {
       await partiesApi.createPartyBranch(partyId, {
         fullLedgerName: ledger,
         locationLabel: newBranchLocation.trim() || undefined,
+        gstIn: newBranchGstIn.trim() || undefined,
         address: newBranchAddress.trim() || undefined,
       });
       const res = await partiesApi.getPartyDetail(partyId);
@@ -224,7 +227,8 @@ export function PartyDetailView(props: Props) {
                       Billing branches
                     </h3>
                     <p className="mt-1 text-xs text-slate-500">
-                      Company GST is on the party; each branch has its own ledger name and address on invoices.
+                      Each branch has its own ledger name and address on invoices. You can set a GSTIN per branch; if
+                      empty, the party-level GSTIN is used.
                     </p>
                   </div>
                   <Button
@@ -269,6 +273,20 @@ export function PartyDetailView(props: Props) {
                           placeholder="e.g. RUDRAPUR"
                           className="mt-1"
                           disabled={branchSaving}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="pb-gst" className="text-slate-700">
+                          GSTIN (optional)
+                        </Label>
+                        <Input
+                          id="pb-gst"
+                          value={newBranchGstIn}
+                          onChange={(e) => setNewBranchGstIn(e.target.value)}
+                          placeholder="Branch GST number"
+                          className="mt-1 font-mono text-sm"
+                          disabled={branchSaving}
+                          autoComplete="off"
                         />
                       </div>
                       <div className="sm:col-span-2">
@@ -331,6 +349,13 @@ export function PartyDetailView(props: Props) {
                             </p>
                             {!row.unassigned && row.branch?.locationLabel && (
                               <p className="text-xs text-slate-600">{row.branch.fullLedgerName}</p>
+                            )}
+                            {!row.unassigned && row.branch?.gstIn && (
+                              <p className="mt-1 text-xs text-slate-600">
+                                <Badge variant="outline" className="font-mono text-[11px]">
+                                  GST {row.branch.gstIn}
+                                </Badge>
+                              </p>
                             )}
                             {!row.unassigned && row.branch?.address && (
                               <p className="mt-1 text-xs text-slate-600 whitespace-pre-wrap">{row.branch.address}</p>
@@ -419,8 +444,11 @@ export function PartyDetailView(props: Props) {
                     data.trips.map((tr) => (
                       <tr key={tr.id} className="border-b border-slate-100 align-top last:border-0">
                         <td className="px-3 py-2 font-mono text-xs">{tr.tripNo}</td>
-                        <td className="max-w-[140px] px-3 py-2 text-xs text-slate-700">
-                          {tr.branchLocationLabel || tr.branchLedgerName || '—'}
+                        <td className="max-w-[160px] px-3 py-2 text-xs text-slate-700">
+                          <div>{tr.branchLocationLabel || tr.branchLedgerName || '—'}</div>
+                          {tr.branchGstIn && (
+                            <div className="mt-0.5 font-mono text-[10px] text-slate-500">GST {tr.branchGstIn}</div>
+                          )}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-slate-600">
                           {new Date(tr.date).toLocaleDateString('en-IN')}

@@ -88,6 +88,8 @@ export interface Invoice {
   gstAmount: number;
   grandTotal: number;
   status: string;
+  /** True when a goods receipt was edited after this invoice was created; download PDF to refresh totals. */
+  needsRegeneration?: boolean;
   notes?: string;
   trips: Trip[];
   moneyReceipts?: MoneyReceipt[];

@@ -11,7 +11,8 @@ import toast from 'react-hot-toast';
 import { partiesApi } from '@/modules/parties/api';
 import type { PartyBranch } from '@/modules/parties/types';
 import { daysUntilEwayExpiry } from '@/lib/calendar-date';
-import { ListFilter, Search, Upload } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { ListFilter, Loader2, Search, Upload } from 'lucide-react';
 
 function todayInputMax(): string {
   const n = new Date();
@@ -31,6 +32,11 @@ function calendarDay(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const d = iso.split('T')[0];
   return d || null;
+}
+
+/** Bilty column filter: received vs not (not individual dates). */
+function biltyFilterColumnValue(trip: { biltyReceivedDate?: string }): string {
+  return calendarDay(trip.biltyReceivedDate) ? 'Received' : 'Not received';
 }
 
 function formatDisplayDate(value: string | null | undefined): string {
@@ -91,6 +97,86 @@ function sumManualExpenseRows(expenses: Array<{ expenseType?: string; amount?: s
     .reduce((sum, row) => sum + parseGrAmount(row?.amount), 0);
 }
 
+/** Bilty (CN) received — checkbox + date, auto-save via parent callbacks. */
+function BiltyReceivedControl({
+  biltyDay,
+  isSaving,
+  onToggle,
+  onDateChange,
+  variant,
+}: {
+  biltyDay: string | null;
+  isSaving: boolean;
+  onToggle: (checked: boolean) => void;
+  onDateChange: (iso: string | null) => void;
+  variant: 'table' | 'card';
+}) {
+  const has = Boolean(biltyDay);
+  const isTable = variant === 'table';
+  return (
+    <div
+      className={cn('min-w-0', !isTable && 'mt-2')}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      {!isTable ? (
+        <div className="mb-1 flex flex-col gap-0.5">
+          <span className="text-[11px] font-semibold leading-tight text-slate-800">Bilty received</span>
+          <span className="text-[10px] leading-snug text-slate-500">CN at office — then add GR</span>
+        </div>
+      ) : null}
+
+      <div
+        className={cn(
+          'inline-flex min-w-0 max-w-full items-center gap-1',
+          isTable ? 'w-min' : 'flex-wrap gap-x-1 gap-y-1',
+        )}
+      >
+        <label className="inline-flex shrink-0 cursor-pointer select-none items-center">
+          <span className="relative inline-flex h-5 w-9 items-center" title="Bilty received at office">
+            <input
+              type="checkbox"
+              className="peer sr-only"
+              checked={has}
+              onChange={(e) => onToggle(e.target.checked)}
+              aria-label={has ? 'Clear bilty received date' : 'Mark bilty as received'}
+            />
+            <span
+              className="block h-5 w-9 rounded-full bg-slate-300 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-400 peer-checked:bg-emerald-500"
+              aria-hidden
+            />
+            <span
+              className="pointer-events-none absolute left-0.5 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow ring-1 ring-black/5 transition-transform duration-200 peer-checked:translate-x-[1.125rem]"
+              aria-hidden
+            />
+          </span>
+        </label>
+
+        {has ? (
+          <input
+            type="date"
+            max={todayInputMax()}
+            disabled={isSaving}
+            className={cn(
+              'min-w-[8.5rem] shrink-0 rounded border border-slate-300 bg-white tabular-nums text-slate-900',
+              'p-0 px-0.5 text-[11px] leading-normal outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30',
+              isSaving && 'cursor-wait opacity-70',
+            )}
+            value={biltyDay || ''}
+            onChange={(e) => onDateChange(e.target.value || null)}
+          />
+        ) : null}
+
+        {isSaving ? <Loader2 className="h-3 w-3 shrink-0 animate-spin text-emerald-600" aria-label="Saving" /> : null}
+      </div>
+
+      {!isTable && !has ? (
+        <p className="mt-1 text-[10px] leading-snug text-slate-400">Turn on when the bilty arrives.</p>
+      ) : null}
+    </div>
+  );
+}
+
 /** Invalid when both set and POD is strictly before GR. */
 function isPodDateBeforeGrDate(podDay: string | null | undefined, grDay: string | null | undefined): boolean {
   if (!podDay || !grDay) return false;
@@ -110,6 +196,8 @@ interface AdminTripData {
   toLocation: string;
   vehicleNumber: string;
   grLrNo?: string;
+  /** When the physical bilty (CN) was received (operations). */
+  biltyReceivedDate?: string;
   grReceivedDate?: string;
   podReceivedDate?: string;
   freight?: number;
@@ -170,6 +258,7 @@ type ColumnFilterKey =
   | 'vehicleNumber'
   | 'grLrNo'
   | 'ewayBillNumber'
+  | 'biltyReceived'
   | 'status';
 
 export function AdminTripTable({
@@ -223,6 +312,7 @@ export function AdminTripTable({
     vehicleNumber: [],
     grLrNo: [],
     ewayBillNumber: [],
+    biltyReceived: [],
     status: [],
   });
   const [openColumnFilter, setOpenColumnFilter] = useState<ColumnFilterKey | null>(null);
@@ -276,6 +366,7 @@ export function AdminTripTable({
       vehicleNumber: [],
       grLrNo: [],
       ewayBillNumber: [],
+      biltyReceived: [],
       status: [],
     });
     setOpenColumnFilter(null);
@@ -302,6 +393,8 @@ export function AdminTripTable({
         return getTripGrNo(trip) || '—';
       case 'ewayBillNumber':
         return trip.ewayBillNumber || '—';
+      case 'biltyReceived':
+        return biltyFilterColumnValue(trip);
       case 'status':
         switch (trip.status.toLowerCase()) {
           case 'pod_pending':
@@ -418,6 +511,8 @@ export function AdminTripTable({
       getTripGrNo(trip),
       trip.billNo || '',
       trip.ewayBillNumber || '',
+      biltyFilterColumnValue(trip),
+      'bilty',
     ]
       .join(' ')
       .toLowerCase();
@@ -676,6 +771,13 @@ export function AdminTripTable({
     const key = `${trip.id}:${String(field)}`;
     setSavingField(key);
     try {
+      if (field === 'biltyReceivedDate') {
+        const v = value as string | null | undefined;
+        if (v && isCalendarDateAfterToday(v)) {
+          toast.error('Date cannot be later than today');
+          return;
+        }
+      }
       if (field === 'grReceivedDate' || field === 'podReceivedDate') {
         const v = value as string | null | undefined;
         if (v && isCalendarDateAfterToday(v)) {
@@ -707,6 +809,7 @@ export function AdminTripTable({
       } else if (
         field === 'grLrNo' ||
         field === 'tollExpense' ||
+        field === 'biltyReceivedDate' ||
         field === 'grReceivedDate' ||
         field === 'podReceivedDate'
       ) {
@@ -719,7 +822,17 @@ export function AdminTripTable({
 
       await api.patch(endpoint, payload);
 
-      if (
+      if (field === 'biltyReceivedDate' && onTripLocalPatch) {
+        const raw = value as string | null | undefined;
+        const patchValue =
+          raw === null || raw === undefined || raw === ''
+            ? undefined
+            : String(raw).split('T')[0];
+        onTripLocalPatch(trip.id, { biltyReceivedDate: patchValue });
+        setShowTripModal((prev) =>
+          prev && prev.id === trip.id ? { ...prev, biltyReceivedDate: patchValue } : prev,
+        );
+      } else if (
         (field === 'ewayBillNumber' || field === 'ewayDate') &&
         onTripLocalPatch
       ) {
@@ -1011,6 +1124,21 @@ export function AdminTripTable({
                     <span className="font-medium text-slate-700">E-way:</span> {trip.ewayBillNumber}
                   </p>
                 )}
+                <BiltyReceivedControl
+                  biltyDay={calendarDay(trip.biltyReceivedDate)}
+                  isSaving={savingField === `${trip.id}:biltyReceivedDate`}
+                  onToggle={(checked) => {
+                    if (checked) {
+                      void saveTripInlineField(trip, 'biltyReceivedDate', todayInputMax());
+                    } else {
+                      void saveTripInlineField(trip, 'biltyReceivedDate', null);
+                    }
+                  }}
+                  onDateChange={(v) => {
+                    void saveTripInlineField(trip, 'biltyReceivedDate', v);
+                  }}
+                  variant="card"
+                />
                 {(needsAdvanceAlert(trip) || needsPaymentPendingAlert(trip)) && (
                   <p className="mt-2 inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
                     {needsAdvanceAlert(trip) ? 'Advance pending (Market)' : 'Payment pending'}
@@ -1038,7 +1166,7 @@ export function AdminTripTable({
           </div>
 
           <div className="hidden md:block table-scroll-bleed border-t border-slate-200">
-            <table className="min-w-[1120px] w-full divide-y divide-slate-200">
+            <table className="min-w-[1280px] w-full divide-y divide-slate-200">
               <thead className="sticky top-0 z-10 bg-slate-50 shadow-sm">
                 <tr>
                   {([
@@ -1141,6 +1269,100 @@ export function AdminTripTable({
                       </th>
                     );
                   })}
+                  <th className="w-min whitespace-nowrap px-1 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                    <div
+                      className="relative inline-flex items-center gap-1"
+                      data-col-filter-root="true"
+                      title="Bilty received — date the consignment note (CN) reached you"
+                    >
+                      <span>Bilty</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openColumnFilterMenu('biltyReceived', e, 'left');
+                        }}
+                        className={`inline-flex h-4 w-4 items-center justify-center rounded border ${
+                          columnFilters.biltyReceived.length > 0
+                            ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                            : 'border-slate-300 bg-white text-slate-500 hover:bg-slate-100'
+                        }`}
+                        aria-label="Filter bilty received"
+                      >
+                        <ListFilter className="h-3 w-3" />
+                      </button>
+                      {openColumnFilter === 'biltyReceived' && columnFilterMenuPos && (
+                        <div
+                          className="fixed z-[90] flex max-h-[60vh] w-56 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white p-2 normal-case shadow-xl"
+                          style={{ left: columnFilterMenuPos.left, top: columnFilterMenuPos.top }}
+                        >
+                          <input
+                            type="text"
+                            value={columnFilterSearch}
+                            onChange={(e) => setColumnFilterSearch(e.target.value)}
+                            placeholder="Search values"
+                            className="mb-2 w-full rounded-md border border-slate-200 px-2 py-1 text-[11px] text-slate-700 outline-none focus:border-emerald-400"
+                          />
+                          <div className="mb-2 flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-1 py-1 text-[11px]">
+                            <input
+                              type="checkbox"
+                              checked={
+                                activeColumnOptions.length > 0 &&
+                                columnFilters.biltyReceived.length === activeColumnOptions.length
+                              }
+                              onChange={(e) =>
+                                setAllColumnFilterValues('biltyReceived', e.target.checked, activeColumnOptions)
+                              }
+                            />
+                            <span className="font-semibold text-slate-700">All</span>
+                          </div>
+                          <div className="min-h-0 flex-1 overflow-y-auto space-y-1 pr-0.5">
+                            {visibleColumnOptions.map((value) => (
+                              <label
+                                key={value}
+                                className="flex items-center gap-2 rounded px-1 py-0.5 text-[11px] text-slate-700 hover:bg-slate-50"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={columnFilters.biltyReceived.includes(value)}
+                                  onChange={() => toggleColumnFilterValue('biltyReceived', value)}
+                                />
+                                <span className="truncate">{value}</span>
+                              </label>
+                            ))}
+                            {visibleColumnOptions.length === 0 && (
+                              <p className="px-1 py-1 text-[11px] text-slate-500">No matching values</p>
+                            )}
+                          </div>
+                          {activeFilteredColumnOptions.length > 4 && (
+                            <button
+                              type="button"
+                              onClick={() => setShowAllFilterOptions((prev) => !prev)}
+                              className="mt-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800"
+                            >
+                              {showAllFilterOptions ? 'Show less' : `View all (${activeFilteredColumnOptions.length})`}
+                            </button>
+                          )}
+                          <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2">
+                            <button
+                              type="button"
+                              onClick={() => setAllColumnFilterValues('biltyReceived', true, activeColumnOptions)}
+                              className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800"
+                            >
+                              Select all
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setAllColumnFilterValues('biltyReceived', false, [])}
+                              className="text-[11px] font-semibold text-slate-600 hover:text-slate-800"
+                            >
+                              Clear
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </th>
                   <th className="px-2.5 py-2 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                     <div className="relative inline-flex items-center justify-end gap-1" data-col-filter-root="true">
                       <span>Status</span>
@@ -1274,6 +1496,23 @@ export function AdminTripTable({
                       ) : (
                         <span className="text-gray-400">—</span>
                       )}
+                    </td>
+                    <td className="w-min p-0 align-middle" onClick={(e) => e.stopPropagation()}>
+                      <BiltyReceivedControl
+                        biltyDay={calendarDay(trip.biltyReceivedDate)}
+                        isSaving={savingField === `${trip.id}:biltyReceivedDate`}
+                        onToggle={(checked) => {
+                          if (checked) {
+                            void saveTripInlineField(trip, 'biltyReceivedDate', todayInputMax());
+                          } else {
+                            void saveTripInlineField(trip, 'biltyReceivedDate', null);
+                          }
+                        }}
+                        onDateChange={(v) => {
+                          void saveTripInlineField(trip, 'biltyReceivedDate', v);
+                        }}
+                        variant="table"
+                      />
                     </td>
                     <td className="px-2.5 py-1.5 whitespace-nowrap text-right text-sm">
                       <span

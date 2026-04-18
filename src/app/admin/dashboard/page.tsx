@@ -71,6 +71,7 @@ type AdminTrip = {
   vendorName: string;
   partyName: string;
   grLrNo?: string;
+  biltyReceivedDate?: string;
   grReceivedDate?: string;
   ewayDate?: string;
   ewayBillNumber?: string | null;
@@ -458,7 +459,7 @@ function AdminDashboardInner() {
           </div>
         </div>
 
-        <div className="max-w-[92rem] mx-auto px-4 sm:px-6 py-4 sm:py-5">
+        <div className="mx-auto min-w-0 w-full max-w-[92rem] px-4 sm:px-6 py-4 sm:py-5">
           {/* Navigation Tabs */}
           <div className="mb-4 sm:mb-5 rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-md">
             <nav className="flex min-w-max flex-nowrap gap-1.5 overflow-x-auto rounded-xl bg-gradient-to-r from-slate-50 via-white to-slate-50 p-1 overscroll-x-contain touch-pan-x [-webkit-overflow-scrolling:touch] sm:flex-wrap sm:overflow-visible">

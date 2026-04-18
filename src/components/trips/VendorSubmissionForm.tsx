@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/Input';
 import { VehicleAutocomplete } from '@/components/ui/VehicleAutocomplete';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { partiesApi } from '@/modules/parties/api';
-import { Party } from '@/modules/parties/types';
+import { Party, PartyBranch } from '@/modules/parties/types';
+import { Search, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 
@@ -38,6 +39,7 @@ function buildVendorSubmissionSchema(forAdmin: boolean) {
       remarks: z.string().optional(),
       ewayBillNumber: z.string().optional(),
       ewayDate: z.string().optional(),
+      partyBranchId: z.string().optional(),
     })
     .superRefine((_data, _ctx) => {
       // Vendor is auto-assigned for admin submissions.
@@ -79,6 +81,11 @@ export function VendorSubmissionForm({
   const [isLoading, setIsLoading] = useState(false);
   const [parties, setParties] = useState<Party[]>([]);
   const [vendors, setVendors] = useState<VendorOption[]>([]);
+  const [partyDropdownOpen, setPartyDropdownOpen] = useState(false);
+  const partyComboboxRef = useRef<HTMLDivElement>(null);
+  const [selectedPartyId, setSelectedPartyId] = useState<string | null>(null);
+  const [partyBranches, setPartyBranches] = useState<PartyBranch[]>([]);
+  const [loadingBranches, setLoadingBranches] = useState(false);
 
   useEffect(() => {
     const fetchParties = async () => {
@@ -139,10 +146,61 @@ export function VendorSubmissionForm({
     defaultValues: {
       date: new Date().toISOString().split('T')[0],
       vendorId: '',
+      partyBranchId: '',
     },
   });
-  const selectedPartyName = watch('partyName') || '';
-  const isMarketParty = selectedPartyName.trim().toLowerCase().includes('market');
+  const partyNameValue = watch('partyName') ?? '';
+  const selectedPartyName = partyNameValue.trim();
+  const isMarketParty = selectedPartyName.toLowerCase().includes('market');
+
+  const partySuggestions = useMemo(() => {
+    if (parties.length === 0) return [];
+    const q = partyNameValue.trim().toLowerCase();
+    const sorted = [...parties].sort((a, b) => a.name.localeCompare(b.name));
+    if (!q) return sorted.slice(0, 40);
+    return sorted.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 50);
+  }, [parties, partyNameValue]);
+
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (partyComboboxRef.current && !partyComboboxRef.current.contains(e.target as Node)) {
+        setPartyDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedPartyId) {
+      setPartyBranches([]);
+      setValue('partyBranchId', '', { shouldValidate: false });
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setLoadingBranches(true);
+      try {
+        const branches = await partiesApi.listPartyBranches(selectedPartyId);
+        if (cancelled) return;
+        const active = branches.filter((b) => b.isActive);
+        setPartyBranches(active);
+        if (active.length === 1) {
+          setValue('partyBranchId', active[0].id, { shouldValidate: true });
+        } else {
+          setValue('partyBranchId', '', { shouldValidate: false });
+        }
+      } catch (e) {
+        console.error('VendorSubmissionForm: branches load failed', e);
+        setPartyBranches([]);
+      } finally {
+        if (!cancelled) setLoadingBranches(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPartyId, setValue]);
   const defaultVendor = vendors.find(
     (v) => v.name.trim().toLowerCase() === 'test transport vendor',
   );
@@ -157,7 +215,15 @@ export function VendorSubmissionForm({
   const onSubmit = async (data: VendorSubmissionData) => {
     setIsLoading(true);
     try {
+      if (selectedPartyId && partyBranches.length > 1 && !(data.partyBranchId ?? '').trim()) {
+        toast.error('Select a billing branch for this party');
+        setIsLoading(false);
+        return;
+      }
       const payload: Record<string, unknown> = { ...data };
+      if (!data.partyBranchId?.trim()) {
+        delete payload.partyBranchId;
+      }
       if (forAdmin) {
         const fallbackVendor =
           defaultVendor?.id || vendors.find((v) => v.name.trim().toLowerCase() === 'test transport vendor')?.id;
@@ -187,7 +253,23 @@ export function VendorSubmissionForm({
       );
       
       onSave(result);
-      reset();
+      reset({
+        date: new Date().toISOString().split('T')[0],
+        vendorId: forAdmin ? defaultVendor?.id ?? '' : '',
+        partyName: '',
+        partyBranchId: '',
+        fromLocation: '',
+        toLocation: '',
+        vehicleNumber: '',
+        initialExpense: undefined,
+        advance: undefined,
+        freight: undefined,
+        remarks: '',
+        ewayBillNumber: '',
+        ewayDate: '',
+      });
+      setSelectedPartyId(null);
+      setPartyBranches([]);
     } catch (error: any) {
       console.error('Vendor submission error:', error);
       const msg = error.response?.data?.message;
@@ -237,43 +319,170 @@ export function VendorSubmissionForm({
             <label className={labelClass}>
               Party Name *
             </label>
-            {parties.length > 0 ? (
+            <div ref={partyComboboxRef} className="relative min-w-0">
               <Controller
                 name="partyName"
                 control={control}
                 render={({ field }) => (
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                  >
-                    <SelectTrigger className={`${controlClass} ${errors.partyName ? 'border-destructive' : ''}`}>
-                      <SelectValue placeholder="Select a party" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {parties.map((party) => (
-                        <SelectItem key={party.id} value={party.name}>
-                          {party.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <>
+                    <div className="relative">
+                      <span
+                        className="pointer-events-none absolute inset-y-0 left-0 z-10 flex w-9 items-center justify-center text-muted-foreground"
+                        aria-hidden
+                      >
+                        <Search className="h-4 w-4 shrink-0" />
+                      </span>
+                      <Input
+                        value={field.value ?? ''}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          field.onChange(v);
+                          setPartyDropdownOpen(true);
+                          const match = selectedPartyId
+                            ? parties.find((p) => p.id === selectedPartyId)
+                            : undefined;
+                          if (match && v.trim() !== match.name) {
+                            setSelectedPartyId(null);
+                            setValue('partyBranchId', '', { shouldValidate: false });
+                          }
+                        }}
+                        onBlur={() => {
+                          field.onBlur();
+                          const t = (field.value ?? '').trim();
+                          const exact = parties.find((p) => p.name === t);
+                          if (exact) {
+                            setSelectedPartyId(exact.id);
+                          } else if (!t) {
+                            setSelectedPartyId(null);
+                            setValue('partyBranchId', '', { shouldValidate: false });
+                          }
+                          setPartyDropdownOpen(false);
+                        }}
+                        onFocus={() => setPartyDropdownOpen(true)}
+                        placeholder={
+                          parties.length > 0
+                            ? 'Type to search or pick from the list…'
+                            : 'Type party name'
+                        }
+                        autoComplete="off"
+                        className={`${controlClass} pl-9 pr-10 ${errors.partyName ? 'border-destructive' : ''}`}
+                      />
+                      {(field.value ?? '').trim() ? (
+                        <button
+                          type="button"
+                          className="absolute inset-y-0 right-0 z-10 flex w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted"
+                          aria-label="Clear party"
+                          onClick={() => {
+                            field.onChange('');
+                            setSelectedPartyId(null);
+                            setValue('partyBranchId', '', { shouldValidate: false });
+                            setPartyDropdownOpen(false);
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      ) : null}
+                      {partyDropdownOpen && parties.length > 0 && (
+                        <ul
+                          className="absolute left-0 right-0 top-full z-[100] mt-1 max-h-56 overflow-auto rounded-lg border border-slate-200 bg-white py-1 text-slate-900 shadow-lg ring-1 ring-black/5"
+                          role="listbox"
+                        >
+                          {partySuggestions.length === 0 ? (
+                            <li className="px-3 py-2.5 text-sm text-slate-500">No matching parties.</li>
+                          ) : (
+                            partySuggestions.map((party) => (
+                              <li key={party.id} role="option">
+                                <button
+                                  type="button"
+                                  className="flex w-full px-3 py-2.5 text-left text-sm text-slate-900 transition-colors hover:bg-emerald-50/90"
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={() => {
+                                    field.onChange(party.name);
+                                    setSelectedPartyId(party.id);
+                                    setPartyDropdownOpen(false);
+                                  }}
+                                >
+                                  {party.name}
+                                </button>
+                              </li>
+                            ))
+                          )}
+                        </ul>
+                      )}
+                    </div>
+                  </>
                 )}
               />
-            ) : (
-              <Input
-                {...register('partyName')}
-                error={errors.partyName?.message}
-                placeholder="Type party name"
-                className={controlClass}
-              />
-            )}
-            {errors.partyName && (
-              <p className="mt-1 text-sm text-destructive">{errors.partyName.message}</p>
-            )}
-            {parties.length === 0 && !isLoading && (
-              <p className="mt-1 text-xs text-muted-foreground">No parties found. Please type the name manually.</p>
-            )}
+              {errors.partyName && (
+                <p className="mt-1 text-sm text-destructive">{errors.partyName.message}</p>
+              )}
+              {parties.length === 0 && !isLoading && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  No parties in master. Type the name manually; it will still be saved on the trip.
+                </p>
+              )}
+              {parties.length > 0 && (
+                <p className="mt-1 text-xs text-muted-foreground">Search by typing; click a row to select a master party.</p>
+              )}
+            </div>
           </div>
+
+          {selectedPartyId && (
+            <div>
+              <label className={labelClass}>
+                Billing branch {partyBranches.length > 1 ? '*' : ''}
+              </label>
+              {loadingBranches ? (
+                <p className={`text-sm text-muted-foreground ${controlClass}`}>Loading branches…</p>
+              ) : partyBranches.length === 0 ? (
+                <p className="rounded-md border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900">
+                  No active billing branches for this party yet. Trip will use party name only until a branch is added.
+                </p>
+              ) : partyBranches.length === 1 ? (
+                <>
+                  <p className={`rounded-md border border-input bg-muted/40 px-3 py-2 text-sm ${controlClass}`}>
+                    {partyBranches[0].locationLabel?.trim()
+                      ? `${partyBranches[0].locationLabel.trim()} — ${partyBranches[0].fullLedgerName}`
+                      : partyBranches[0].fullLedgerName}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Single branch — linked automatically for invoicing.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Controller
+                    name="partyBranchId"
+                    control={control}
+                    render={({ field }) => (
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value || undefined}
+                      >
+                        <SelectTrigger
+                          className={`${controlClass} ${errors.partyBranchId ? 'border-destructive' : ''}`}
+                        >
+                          <SelectValue placeholder="Select billing branch" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {partyBranches.map((b) => (
+                            <SelectItem key={b.id} value={b.id}>
+                              {b.locationLabel?.trim()
+                                ? `${b.locationLabel.trim()} — ${b.fullLedgerName}`
+                                : b.fullLedgerName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Choose the ledger branch for invoices and GST.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
 
           <div>
             <label className={labelClass}>

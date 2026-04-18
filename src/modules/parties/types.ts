@@ -39,6 +39,8 @@ export interface PartyBranch {
   partyId: string;
   locationLabel: string | null;
   fullLedgerName: string;
+  /** When set, overrides party GSTIN on invoices for this branch. */
+  gstIn?: string | null;
   address: string | null;
   isActive: boolean;
   createdAt: string;
@@ -48,6 +50,7 @@ export interface PartyBranch {
 export interface CreatePartyBranchRequest {
   fullLedgerName: string;
   locationLabel?: string;
+  gstIn?: string;
   address?: string;
 }
 
@@ -113,6 +116,7 @@ export interface PartyDetailTripRow {
   partyBranchId?: string | null;
   branchLedgerName?: string | null;
   branchLocationLabel?: string | null;
+  branchGstIn?: string | null;
 }
 
 export interface PartyDetailBranchBreakdown {
@@ -120,6 +124,7 @@ export interface PartyDetailBranchBreakdown {
     id: string;
     locationLabel: string | null;
     fullLedgerName: string;
+    gstIn: string | null;
     address: string | null;
     isActive: boolean;
   } | null;

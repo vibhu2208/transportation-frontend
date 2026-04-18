@@ -19,13 +19,16 @@ import {
   MapPin,
   FileText,
   Download,
+  Eye,
   Loader2,
   Receipt,
   RefreshCw,
   IndianRupee,
   Search,
   X,
+  AlertTriangle,
 } from 'lucide-react';
+import { openPdfBlobInNewTab } from '@/lib/pdf-preview';
 import { invoicesApi } from './api';
 import { partiesApi } from '../parties/api';
 import {
@@ -215,6 +218,7 @@ export default function InvoiceManagement() {
         if (brs.length === 1) {
           setSelectedPartyBranchId(brs[0].id);
           setPartyAddress(brs[0].address || partyMaster.address || '');
+          setPartyGstIn((brs[0].gstIn && brs[0].gstIn.trim()) || partyMaster.gstIn || '');
         }
       } catch {
         setBillingBranches([]);
@@ -247,7 +251,7 @@ export default function InvoiceManagement() {
     const pm = parties.find((p) => p.name === selectedParty);
     if (b && pm) {
       setPartyAddress(b.address || pm.address || '');
-      setPartyGstIn(pm.gstIn || '');
+      setPartyGstIn((b.gstIn && b.gstIn.trim()) || pm.gstIn || '');
     }
   };
 
@@ -482,6 +486,48 @@ export default function InvoiceManagement() {
     }
   };
 
+  const handlePreviewMoneyReceipt = async (invoiceId: string, receiptId: string) => {
+    const key = `${invoiceId}:${receiptId}`;
+    setDownloadingMr(key);
+    try {
+      const blob = await invoicesApi.downloadMoneyReceiptPdf(invoiceId, receiptId);
+      if (!openPdfBlobInNewTab(blob)) {
+        setError('Pop-up blocked. Allow pop-ups to preview the PDF.');
+      }
+    } catch {
+      setError('Failed to preview money receipt');
+    } finally {
+      setDownloadingMr(null);
+    }
+  };
+
+  const handlePreviewPdf = async (invoiceId: string) => {
+    setDownloadingPdf(invoiceId);
+    try {
+      const blob = await invoicesApi.downloadInvoicePdf(invoiceId, {
+        templateKey: selectedTemplate,
+        customHtmlTemplate: selectedTemplate === 'custom' ? customTemplateHtml : undefined,
+      });
+      if (!openPdfBlobInNewTab(blob)) {
+        setError('Pop-up blocked. Allow pop-ups to preview the PDF.');
+        return;
+      }
+      try {
+        const updated = await invoicesApi.getInvoice(invoiceId);
+        setInvoices((prev) => prev.map((inv) => (inv.id === invoiceId ? { ...inv, ...updated } : inv)));
+        setSelectedInvoiceDetails((cur) =>
+          cur?.id === invoiceId ? { ...cur, ...updated } : cur,
+        );
+      } catch {
+        // same as download: best-effort refresh after PDF generation
+      }
+    } catch {
+      setError('Failed to preview PDF');
+    } finally {
+      setDownloadingPdf(null);
+    }
+  };
+
   const handleDownloadPdf = async (invoiceId: string, invoiceNo: string) => {
     setDownloadingPdf(invoiceId);
     try {
@@ -497,6 +543,15 @@ export default function InvoiceManagement() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+      try {
+        const updated = await invoicesApi.getInvoice(invoiceId);
+        setInvoices((prev) => prev.map((inv) => (inv.id === invoiceId ? { ...inv, ...updated } : inv)));
+        setSelectedInvoiceDetails((cur) =>
+          cur?.id === invoiceId ? { ...cur, ...updated } : cur,
+        );
+      } catch {
+        // List still valid; totals refresh is best-effort after PDF.
+      }
     } catch {
       setError('Failed to download PDF');
     } finally {
@@ -895,8 +950,8 @@ export default function InvoiceManagement() {
               </p>
             ) : (
               <>
-                <div className="-mx-0.5 flex min-w-0 flex-nowrap items-end gap-1.5 overflow-x-auto px-0.5 pb-px sm:gap-2">
-                  <div className="min-w-[9.5rem] flex-1 basis-0">
+                <div className="-mx-0.5 flex min-w-0 flex-wrap items-end gap-1.5 px-0.5 pb-px sm:gap-2">
+                  <div className="min-w-[9rem] flex-1 basis-[min(100%,12rem)] sm:basis-0">
                     <Label htmlFor="inv-no" className="text-xs">
                       Invoice number <span className="text-red-600">*</span>
                     </Label>
@@ -1072,6 +1127,7 @@ export default function InvoiceManagement() {
                           <SelectItem key={b.id} value={b.id}>
                             {b.locationLabel ? `${b.locationLabel} — ` : ''}
                             {b.fullLedgerName}
+                            {b.gstIn?.trim() ? ` · GST ${b.gstIn.trim()}` : ''}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1086,6 +1142,11 @@ export default function InvoiceManagement() {
                   <div className="rounded-lg border border-emerald-200/80 bg-emerald-50/40 px-3 py-2 text-sm text-slate-800">
                     <span className="font-medium text-emerald-900">Billing branch / ledger: </span>
                     {billingBranches[0].fullLedgerName}
+                    {billingBranches[0].gstIn?.trim() && (
+                      <span className="ml-1 font-mono text-xs text-slate-600">
+                        · GST {billingBranches[0].gstIn.trim()}
+                      </span>
+                    )}
                   </div>
                 )}
 
@@ -1349,48 +1410,48 @@ export default function InvoiceManagement() {
       >
         <Card className="rounded-xl border-slate-200/80 shadow-md ring-1 ring-slate-200/60">
           <CardHeader className="border-b border-slate-100 pb-4">
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-900">
-                <Receipt className="h-4 w-4" />
-              </span>
-              <div className="min-w-[220px] shrink-0">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:gap-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-900">
+                  <Receipt className="h-4 w-4" />
+                </span>
                 <CardTitle className="text-lg font-semibold text-slate-900">Invoices & collections</CardTitle>
               </div>
-              <div className="flex min-w-0 flex-1 flex-nowrap gap-2 overflow-x-auto">
-                <div className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="flex min-w-0 flex-1 flex-wrap gap-2">
+                <div className="min-w-0 flex-[1_1_9rem] rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 sm:px-3">
                   <p className="text-[11px] text-slate-500">Unpaid invoices</p>
                   <p className="text-base font-semibold tabular-nums text-slate-900">{invoiceHeaderStats.unpaidInvoices}</p>
                 </div>
-                <div className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <div className="min-w-0 flex-[1_1_9rem] rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 sm:px-3">
                   <p className="text-[11px] text-slate-500">Paid invoices</p>
                   <p className="text-base font-semibold tabular-nums text-slate-900">{invoiceHeaderStats.paidInvoices}</p>
                 </div>
-                <div className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <div className="min-w-0 flex-[1_1_9rem] rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 sm:px-3">
                   <p className="text-[11px] text-slate-500">Total paid amount</p>
                   <p className="text-base font-semibold tabular-nums text-slate-900">
                     ₹{invoiceHeaderStats.totalPaidAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
-                <div className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <div className="min-w-0 flex-[1_1_9rem] rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 sm:px-3">
                   <p className="text-[11px] text-slate-500">Total unpaid amount</p>
                   <p className="text-base font-semibold tabular-nums text-slate-900">
                     ₹{invoiceHeaderStats.totalUnpaidAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
-                <div className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <div className="min-w-0 flex-[1_1_9rem] rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 sm:px-3">
                   <p className="text-[11px] text-slate-500">Best payment ratio party</p>
                   <p className="truncate text-base font-semibold text-slate-900">{invoiceHeaderStats.bestPaymentRatioParty}</p>
                   <p className="text-[11px] tabular-nums text-slate-500">
                     {invoiceHeaderStats.bestPaymentRatioPct.toLocaleString('en-IN', { minimumFractionDigits: 2 })}%
                   </p>
                 </div>
-                <div className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <div className="min-w-0 flex-[1_1_9rem] rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 sm:px-3">
                   <p className="text-[11px] text-slate-500">Collection efficiency</p>
                   <p className="text-base font-semibold tabular-nums text-slate-900">
                     {invoiceHeaderStats.collectionEfficiencyPct.toLocaleString('en-IN', { minimumFractionDigits: 2 })}%
                   </p>
                 </div>
-                <div className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <div className="min-w-0 flex-[1_1_9rem] rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 sm:px-3">
                   <p className="text-[11px] text-slate-500">Avg payment cycle</p>
                   <p className="text-base font-semibold tabular-nums text-slate-900">
                     {invoiceHeaderStats.averagePaymentCycleDays.toLocaleString('en-IN', { minimumFractionDigits: 1 })} days
@@ -1453,7 +1514,7 @@ export default function InvoiceManagement() {
                       ))}
                     </div>
                   </div>
-                  <div className="min-w-[280px] flex-1">
+                  <div className="min-w-0 w-full flex-[1_1_12rem] sm:max-w-md">
                     <Label className="text-[11px] text-slate-600">Search</Label>
                     <div className="relative mt-1">
                       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -1487,7 +1548,7 @@ export default function InvoiceManagement() {
                       </div>
                     </>
                   )}
-                  <div className="min-w-[200px] flex-1">
+                  <div className="min-w-0 w-full flex-[1_1_10rem] sm:max-w-xs">
                     <Label className="text-[11px] text-slate-600">Party</Label>
                     <Input
                       className="mt-1 h-9 rounded-md text-xs"
@@ -1524,23 +1585,23 @@ export default function InvoiceManagement() {
                     </Button>
                   </div>
                 </div>
-                <div className="table-scroll-bleed overflow-x-auto border-t border-slate-200">
-                <table className="min-w-[1220px] w-full text-sm">
+                <div className="table-scroll-bleed border-t border-slate-200">
+                <table className="w-full min-w-0 table-fixed border-collapse text-[11px] sm:text-sm">
                   <thead className="sticky top-0 z-10 bg-slate-50">
                     <tr className="border-b border-slate-200 text-left">
-                      <th className="px-3 py-2 font-semibold text-slate-700">Invoice</th>
-                      <th className="px-3 py-2 font-semibold text-slate-700">Date</th>
-                      <th className="px-3 py-2 font-semibold text-slate-700">Party</th>
-                      <th className="px-3 py-2 font-semibold text-slate-700">From location</th>
-                      <th className="w-[220px] px-3 py-2 font-semibold text-slate-700">GR/LR</th>
-                      <th className="px-3 py-2 font-semibold text-slate-700">Trips</th>
-                      <th className="px-3 py-2 text-right font-semibold text-slate-700">Freight</th>
-                      <th className="px-3 py-2 text-right font-semibold text-slate-700">GST applied</th>
-                      <th className="px-3 py-2 text-right font-semibold text-slate-700">Expense</th>
-                      <th className="px-3 py-2 text-right font-semibold text-slate-700">Total</th>
-                      <th className="px-3 py-2 text-right font-semibold text-slate-700">Paid</th>
-                      <th className="px-3 py-2 text-right font-semibold text-slate-700">Status</th>
-                      <th className="px-3 py-2 text-right font-semibold text-slate-700">Actions</th>
+                      <th className="w-[8%] px-1.5 py-2 font-semibold text-slate-700 sm:px-2.5">Invoice</th>
+                      <th className="w-[6%] px-1.5 py-2 font-semibold text-slate-700 sm:px-2.5">Date</th>
+                      <th className="w-[9%] px-1.5 py-2 font-semibold text-slate-700 sm:px-2.5">Party</th>
+                      <th className="w-[7%] px-1.5 py-2 font-semibold text-slate-700 sm:px-2.5">From</th>
+                      <th className="w-[7%] px-1.5 py-2 font-semibold text-slate-700 sm:px-2.5">GR/LR</th>
+                      <th className="w-[4%] px-1.5 py-2 font-semibold text-slate-700 sm:px-2.5">Trips</th>
+                      <th className="w-[8%] px-1.5 py-2 text-right font-semibold text-slate-700 sm:px-2.5">Freight</th>
+                      <th className="w-[7%] px-1.5 py-2 text-right font-semibold text-slate-700 sm:px-2.5">GST</th>
+                      <th className="w-[7%] px-1.5 py-2 text-right font-semibold text-slate-700 sm:px-2.5">Expense</th>
+                      <th className="w-[7%] px-1.5 py-2 text-right font-semibold text-slate-700 sm:px-2.5">Total</th>
+                      <th className="w-[7%] px-1.5 py-2 text-right font-semibold text-slate-700 sm:px-2.5">Paid</th>
+                      <th className="w-[6%] px-1.5 py-2 text-right font-semibold text-slate-700 sm:px-2.5">Status</th>
+                      <th className="w-[11%] px-1.5 py-2 text-right font-semibold text-slate-700 sm:px-2.5">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
@@ -1550,15 +1611,31 @@ export default function InvoiceManagement() {
                           className="cursor-pointer hover:bg-slate-50/70"
                           onClick={() => openInvoiceDetails(invoice)}
                         >
-                          <td className="px-3 py-2.5 font-semibold text-slate-900">{invoice.invoiceNo}</td>
-                          <td className="px-3 py-2.5 text-slate-700">
+                          <td className="max-w-0 px-1.5 py-2 align-top font-semibold text-slate-900 sm:px-2.5 sm:py-2.5">
+                            <div className="flex min-w-0 flex-col gap-1">
+                              <span className="truncate">{invoice.invoiceNo}</span>
+                              {invoice.needsRegeneration ? (
+                                <span
+                                  className="inline-flex max-w-full items-center gap-0.5 rounded border border-amber-200 bg-amber-50 px-1 py-0.5 text-[9px] font-medium leading-tight text-amber-900 sm:gap-1 sm:text-[10px]"
+                                  title="Goods receipt was edited after this invoice. Download the PDF to refresh invoice totals and line items."
+                                >
+                                  <AlertTriangle className="h-2.5 w-2.5 shrink-0 sm:h-3 sm:w-3" aria-hidden />
+                                  <span className="min-w-0 truncate sm:hidden">Update PDF</span>
+                                  <span className="hidden min-w-0 sm:inline">GR updated — regenerate PDF</span>
+                                </span>
+                              ) : null}
+                            </div>
+                          </td>
+                          <td className="max-w-0 truncate px-1.5 py-2 align-top text-slate-700 sm:px-2.5 sm:py-2.5">
                             {new Date(invoice.invoiceDate).toLocaleDateString('en-IN')}
                           </td>
-                          <td className="px-3 py-2.5 text-slate-800">{invoice.partyName}</td>
-                          <td className="px-3 py-2.5 text-slate-700">
+                          <td className="max-w-0 truncate px-1.5 py-2 align-top text-slate-800 sm:px-2.5 sm:py-2.5" title={invoice.partyName}>
+                            {invoice.partyName}
+                          </td>
+                          <td className="max-w-0 truncate px-1.5 py-2 align-top text-slate-700 sm:px-2.5 sm:py-2.5" title={getInvoiceFromLocationsLabel(invoice)}>
                             {getInvoiceFromLocationsLabel(invoice)}
                           </td>
-                          <td className="w-[220px] px-3 py-2.5 text-slate-700">
+                          <td className="max-w-0 px-1.5 py-2 align-top text-slate-700 sm:px-2.5 sm:py-2.5">
                             {(() => {
                               const grNumbers = Array.from(
                                 new Set((invoice.trips || []).map((trip) => {
@@ -1573,7 +1650,7 @@ export default function InvoiceManagement() {
                               const fullList = grNumbers.join(', ');
                               return (
                                 <span
-                                  className="block max-w-[220px] truncate whitespace-nowrap"
+                                  className="block truncate"
                                   title={fullList}
                                 >
                                   {summary}
@@ -1581,47 +1658,67 @@ export default function InvoiceManagement() {
                               );
                             })()}
                           </td>
-                          <td className="px-3 py-2.5 text-slate-700">{invoice.trips.length}</td>
-                          <td className="px-3 py-2.5 text-right tabular-nums text-slate-800">
+                          <td className="px-1.5 py-2 text-center align-top text-slate-700 sm:px-2.5 sm:py-2.5">{invoice.trips.length}</td>
+                          <td className="max-w-0 truncate px-1.5 py-2 text-right align-top tabular-nums text-slate-800 sm:px-2.5 sm:py-2.5">
                             ₹{getInvoiceFreightTotal(invoice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </td>
-                          <td className="px-3 py-2.5 text-right tabular-nums text-slate-800">
-                            <div>₹{(invoice.gstAmount ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
-                            <div className="text-[11px] text-slate-500">@{invoice.gstRate ?? 0}%</div>
+                          <td className="max-w-0 px-1.5 py-2 text-right align-top tabular-nums text-slate-800 sm:px-2.5 sm:py-2.5">
+                            <div className="truncate text-[10px] sm:text-sm">₹{(invoice.gstAmount ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                            <div className="text-[9px] text-slate-500 sm:text-[11px]">@{invoice.gstRate ?? 0}%</div>
                           </td>
-                          <td className="px-3 py-2.5 text-right tabular-nums text-slate-800">
+                          <td className="max-w-0 truncate px-1.5 py-2 text-right align-top tabular-nums text-slate-800 sm:px-2.5 sm:py-2.5">
                             ₹{getInvoiceExpenseTotal(invoice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </td>
-                          <td className="px-3 py-2.5 text-right tabular-nums text-slate-800">
+                          <td className="max-w-0 truncate px-1.5 py-2 text-right align-top tabular-nums text-slate-800 sm:px-2.5 sm:py-2.5">
                             ₹{invoice.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </td>
-                          <td className="px-3 py-2.5 text-right tabular-nums text-slate-800">
+                          <td className="max-w-0 truncate px-1.5 py-2 text-right align-top tabular-nums text-slate-800 sm:px-2.5 sm:py-2.5">
                             ₹{getReceivedTotal(invoice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </td>
-                          <td className="px-3 py-2.5 text-right">
+                          <td className="px-1.5 py-2 text-right align-top sm:px-2.5 sm:py-2.5">
                             <Badge
                               variant={getInvoicePaymentTag(invoice) === 'PAID' ? 'default' : 'secondary'}
-                              className="rounded-md"
+                              className="rounded-md px-1.5 py-0 text-[10px] sm:px-2.5 sm:text-xs"
                             >
                               {getInvoicePaymentTag(invoice)}
                             </Badge>
                           </td>
-                          <td className="px-3 py-2.5">
-                            <div className="flex justify-end gap-2">
+                          <td className="px-1.5 py-2 align-top sm:px-2.5 sm:py-2.5">
+                            <div className="flex flex-col items-end gap-1 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-1.5">
                               {invoice.partyId && (
                                 <Link
                                   href={`/admin/dashboard?tab=moneyReceipt&partyId=${encodeURIComponent(invoice.partyId)}`}
-                                  className="inline-flex h-8 items-center justify-center rounded-md border border-emerald-200 bg-white px-2.5 text-xs font-medium text-emerald-800 hover:bg-emerald-50"
+                                  className="inline-flex h-7 max-w-full items-center justify-center rounded-md border border-emerald-200 bg-white px-1.5 text-[10px] font-medium text-emerald-800 hover:bg-emerald-50 sm:h-8 sm:px-2.5 sm:text-xs"
+                                  title="GR settlement"
                                   onClick={(e) => e.stopPropagation()}
                                 >
-                                  GR settlement
+                                  <span className="truncate">GR settle</span>
                                 </Link>
                               )}
                               <Button
                                 type="button"
                                 size="sm"
+                                variant="outline"
+                                className="h-8 rounded-md px-2.5 text-xs"
+                                title="Preview invoice PDF"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handlePreviewPdf(invoice.id);
+                                }}
+                                disabled={downloadingPdf === invoice.id}
+                              >
+                                {downloadingPdf === invoice.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Eye className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
                                 variant="secondary"
                                 className="h-8 rounded-md px-2.5 text-xs"
+                                title="Download invoice PDF"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleDownloadPdf(invoice.id, invoice.invoiceNo);
@@ -1742,69 +1839,105 @@ export default function InvoiceManagement() {
                                   <p className="mt-1 text-xs text-slate-600">
                                     {new Date(r.paymentDate).toLocaleDateString('en-IN')}
                                   </p>
-                                  <div className="mt-2 flex items-center justify-between">
+                                  <div className="mt-2 flex items-center justify-between gap-2">
                                     <span className="tabular-nums font-medium">
                                       ₹{r.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                     </span>
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      className="h-8 rounded-lg px-2"
-                                      disabled={downloadingMr === `${invoice.id}:${r.id}`}
-                                      onClick={() =>
-                                        handleDownloadMoneyReceipt(invoice.id, r.id, r.receiptNo)
-                                      }
-                                    >
-                                      {downloadingMr === `${invoice.id}:${r.id}` ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : (
-                                        <Download className="h-4 w-4" />
-                                      )}
-                                    </Button>
+                                    <div className="flex shrink-0 gap-1">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 rounded-lg px-2"
+                                        title="Preview PDF"
+                                        disabled={downloadingMr === `${invoice.id}:${r.id}`}
+                                        onClick={() => handlePreviewMoneyReceipt(invoice.id, r.id)}
+                                      >
+                                        {downloadingMr === `${invoice.id}:${r.id}` ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <Eye className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 rounded-lg px-2"
+                                        title="Download PDF"
+                                        disabled={downloadingMr === `${invoice.id}:${r.id}`}
+                                        onClick={() =>
+                                          handleDownloadMoneyReceipt(invoice.id, r.id, r.receiptNo)
+                                        }
+                                      >
+                                        {downloadingMr === `${invoice.id}:${r.id}` ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <Download className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                    </div>
                                   </div>
                                 </div>
                               ))}
                             </div>
-                            <div className="mt-4 hidden md:block overflow-x-auto rounded-lg border border-slate-200 bg-white table-scroll-bleed">
-                              <table className="w-full min-w-[480px] text-sm">
+                            <div className="mt-4 hidden md:block rounded-lg border border-slate-200 bg-white">
+                              <table className="w-full min-w-0 table-fixed border-collapse text-sm">
                                 <thead>
                                   <tr className="border-b border-slate-200 bg-slate-50 text-left sticky top-0 z-10">
-                                    <th className="px-3 py-2 font-medium text-slate-700">Receipt</th>
-                                    <th className="px-3 py-2 font-medium text-slate-700">Date</th>
-                                    <th className="px-3 py-2 font-medium text-slate-700">Type</th>
-                                    <th className="px-3 py-2 text-right font-medium text-slate-700">Amount</th>
-                                    <th className="px-3 py-2 text-right font-medium text-slate-700">PDF</th>
+                                    <th className="w-[22%] px-2 py-2 font-medium text-slate-700">Receipt</th>
+                                    <th className="w-[18%] px-2 py-2 font-medium text-slate-700">Date</th>
+                                    <th className="w-[18%] px-2 py-2 font-medium text-slate-700">Type</th>
+                                    <th className="w-[22%] px-2 py-2 text-right font-medium text-slate-700">Amount</th>
+                                    <th className="w-[20%] px-2 py-2 text-right font-medium text-slate-700">PDF</th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                   {(invoice.moneyReceipts || []).map((r) => (
                                     <tr key={r.id} className="border-b border-slate-100 last:border-0">
-                                      <td className="px-3 py-2 font-mono text-xs">{r.receiptNo}</td>
-                                      <td className="px-3 py-2">
+                                      <td className="max-w-0 truncate px-2 py-2 font-mono text-xs">{r.receiptNo}</td>
+                                      <td className="max-w-0 truncate px-2 py-2">
                                         {new Date(r.paymentDate).toLocaleDateString('en-IN')}
                                       </td>
-                                      <td className="px-3 py-2">{r.paymentType}</td>
-                                      <td className="px-3 py-2 text-right tabular-nums">
+                                      <td className="max-w-0 truncate px-2 py-2">{r.paymentType}</td>
+                                      <td className="max-w-0 truncate px-2 py-2 text-right tabular-nums">
                                         ₹{r.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                       </td>
-                                      <td className="px-3 py-2 text-right">
-                                        <Button
-                                          type="button"
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-8 rounded-lg px-2"
-                                          disabled={downloadingMr === `${invoice.id}:${r.id}`}
-                                          onClick={() =>
-                                            handleDownloadMoneyReceipt(invoice.id, r.id, r.receiptNo)
-                                          }
-                                        >
-                                          {downloadingMr === `${invoice.id}:${r.id}` ? (
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                          ) : (
-                                            <Download className="h-4 w-4" />
-                                          )}
-                                        </Button>
+                                      <td className="px-2 py-2 text-right">
+                                        <div className="flex justify-end gap-1">
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-8 rounded-lg px-2"
+                                            title="Preview PDF"
+                                            disabled={downloadingMr === `${invoice.id}:${r.id}`}
+                                            onClick={() => handlePreviewMoneyReceipt(invoice.id, r.id)}
+                                          >
+                                            {downloadingMr === `${invoice.id}:${r.id}` ? (
+                                              <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                              <Eye className="h-4 w-4" />
+                                            )}
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-8 rounded-lg px-2"
+                                            title="Download PDF"
+                                            disabled={downloadingMr === `${invoice.id}:${r.id}`}
+                                            onClick={() =>
+                                              handleDownloadMoneyReceipt(invoice.id, r.id, r.receiptNo)
+                                            }
+                                          >
+                                            {downloadingMr === `${invoice.id}:${r.id}` ? (
+                                              <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                              <Download className="h-4 w-4" />
+                                            )}
+                                          </Button>
+                                        </div>
                                       </td>
                                     </tr>
                                   ))}
@@ -1837,21 +1970,64 @@ export default function InvoiceManagement() {
             className="mx-auto flex w-full max-w-4xl flex-col rounded-2xl border border-slate-200 bg-white shadow-xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 sm:px-5">
-              <div>
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-5">
+              <div className="min-w-0 flex-1">
                 <h3 className="text-base font-semibold text-slate-900">Invoice details</h3>
                 <p className="text-xs text-slate-500">
                   {selectedInvoiceDetails.invoiceNo} · {selectedInvoiceDetails.partyName}
                 </p>
+                {selectedInvoiceDetails.needsRegeneration ? (
+                  <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-900">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                    <span>
+                      A goods receipt on this invoice was edited. Download the invoice PDF to refresh stored
+                      totals and print with the latest data.
+                    </span>
+                  </p>
+                ) : null}
               </div>
-              <button
-                type="button"
-                onClick={() => setSelectedInvoiceDetails(null)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100"
-                aria-label="Close invoice details"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <div className="flex shrink-0 items-center gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 rounded-md px-2.5"
+                  title="Preview invoice PDF"
+                  disabled={downloadingPdf === selectedInvoiceDetails.id}
+                  onClick={() => handlePreviewPdf(selectedInvoiceDetails.id)}
+                >
+                  {downloadingPdf === selectedInvoiceDetails.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="h-8 rounded-md px-2.5"
+                  title="Download invoice PDF"
+                  disabled={downloadingPdf === selectedInvoiceDetails.id}
+                  onClick={() =>
+                    handleDownloadPdf(selectedInvoiceDetails.id, selectedInvoiceDetails.invoiceNo)
+                  }
+                >
+                  {downloadingPdf === selectedInvoiceDetails.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedInvoiceDetails(null)}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100"
+                  aria-label="Close invoice details"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 sm:p-5">
               {(() => {
@@ -1897,32 +2073,32 @@ export default function InvoiceManagement() {
                     <div className="rounded-lg border border-slate-200 p-2">
                       <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Financial summary</p>
                       <div className="w-full">
-                        <div className="flex w-full flex-nowrap gap-2 overflow-x-auto">
-                          <div className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-2 py-1.5">
+                        <div className="flex w-full flex-wrap gap-2">
+                          <div className="min-w-0 flex-[1_1_7rem] rounded border border-slate-200 bg-white px-2 py-1.5 sm:flex-1 sm:basis-0">
                             <p className="text-[10px] text-slate-500">Total expense</p>
                             <p className="tabular-nums text-sm font-semibold">₹{expenses.toFixed(2)}</p>
                           </div>
-                          <div className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-2 py-1.5">
+                          <div className="min-w-0 flex-[1_1_7rem] rounded border border-slate-200 bg-white px-2 py-1.5 sm:flex-1 sm:basis-0">
                             <p className="text-[10px] text-slate-500">Received</p>
                             <p className="tabular-nums text-sm font-semibold">₹{received.toFixed(2)}</p>
                           </div>
-                          <div className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-2 py-1.5">
+                          <div className="min-w-0 flex-[1_1_7rem] rounded border border-slate-200 bg-white px-2 py-1.5 sm:flex-1 sm:basis-0">
                             <p className="text-[10px] text-slate-500">TDS %</p>
                             <p className="tabular-nums text-sm font-semibold">{tdsPercentLabel}</p>
                           </div>
-                          <div className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-2 py-1.5">
+                          <div className="min-w-0 flex-[1_1_7rem] rounded border border-slate-200 bg-white px-2 py-1.5 sm:flex-1 sm:basis-0">
                             <p className="text-[10px] text-slate-500">TDS</p>
                             <p className="tabular-nums text-sm font-semibold">₹{tds.toFixed(2)}</p>
                           </div>
-                          <div className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-2 py-1.5">
+                          <div className="min-w-0 flex-[1_1_7rem] rounded border border-slate-200 bg-white px-2 py-1.5 sm:flex-1 sm:basis-0">
                             <p className="text-[10px] text-slate-500">Deduction</p>
                             <p className="tabular-nums text-sm font-semibold">₹{deduction.toFixed(2)}</p>
                           </div>
-                          <div className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-2 py-1.5">
+                          <div className="min-w-0 flex-[1_1_7rem] rounded border border-slate-200 bg-white px-2 py-1.5 sm:flex-1 sm:basis-0">
                             <p className="text-[10px] text-slate-500">Invoice total</p>
                             <p className="tabular-nums text-sm font-semibold">₹{inv.grandTotal.toFixed(2)}</p>
                           </div>
-                          <div className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-2 py-1.5">
+                          <div className="min-w-0 flex-[1_1_7rem] rounded border border-slate-200 bg-white px-2 py-1.5 sm:flex-1 sm:basis-0">
                             <p className="text-[10px] text-slate-500">Profit/Loss</p>
                             <p className={`tabular-nums text-sm font-semibold ${profitLoss >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>₹{profitLoss.toFixed(2)}</p>
                           </div>
@@ -1947,33 +2123,33 @@ export default function InvoiceManagement() {
                       {(inv.trips || []).length === 0 ? (
                         <p className="text-sm text-slate-500">No trips linked.</p>
                       ) : (
-                        <div className="table-scroll-bleed overflow-x-auto rounded border border-slate-200">
-                          <table className="w-full min-w-[760px] text-sm">
+                        <div className="table-scroll-bleed rounded border border-slate-200">
+                          <table className="w-full min-w-0 table-fixed border-collapse text-[11px] sm:text-sm">
                             <thead className="bg-slate-50">
                               <tr className="border-b border-slate-200 text-left">
-                                <th className="px-2 py-2 font-medium text-slate-700">Trip no.</th>
-                                <th className="px-2 py-2 font-medium text-slate-700">Date</th>
-                                <th className="px-2 py-2 font-medium text-slate-700">From</th>
-                                <th className="px-2 py-2 font-medium text-slate-700">To</th>
-                                <th className="px-2 py-2 font-medium text-slate-700">Vehicle</th>
-                                <th className="px-2 py-2 font-medium text-slate-700">GR/LR</th>
-                                <th className="px-2 py-2 text-right font-medium text-slate-700">Freight</th>
-                                <th className="px-2 py-2 text-right font-medium text-slate-700">Expense</th>
+                                <th className="w-[12%] px-1.5 py-2 font-medium text-slate-700 sm:px-2">Trip</th>
+                                <th className="w-[9%] px-1.5 py-2 font-medium text-slate-700 sm:px-2">Date</th>
+                                <th className="w-[14%] px-1.5 py-2 font-medium text-slate-700 sm:px-2">From</th>
+                                <th className="w-[14%] px-1.5 py-2 font-medium text-slate-700 sm:px-2">To</th>
+                                <th className="w-[12%] px-1.5 py-2 font-medium text-slate-700 sm:px-2">Vehicle</th>
+                                <th className="w-[11%] px-1.5 py-2 font-medium text-slate-700 sm:px-2">GR/LR</th>
+                                <th className="w-[14%] px-1.5 py-2 text-right font-medium text-slate-700 sm:px-2">Freight</th>
+                                <th className="w-[14%] px-1.5 py-2 text-right font-medium text-slate-700 sm:px-2">Expense</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 bg-white">
                               {(inv.trips || []).map((trip) => (
                                 <tr key={trip.id}>
-                                  <td className="px-2 py-2 font-medium text-slate-900">{trip.tripNo}</td>
-                                  <td className="px-2 py-2 text-slate-700">{new Date(trip.date).toLocaleDateString('en-IN')}</td>
-                                  <td className="px-2 py-2 text-slate-700">{trip.fromLocation}</td>
-                                  <td className="px-2 py-2 text-slate-700">{trip.toLocation}</td>
-                                  <td className="px-2 py-2 text-slate-700">{trip.vehicleNumber}</td>
-                                  <td className="px-2 py-2 text-slate-700">{trip.grLrNo || '—'}</td>
-                                  <td className="px-2 py-2 text-right tabular-nums text-slate-900">
+                                  <td className="max-w-0 truncate px-1.5 py-2 font-medium text-slate-900 sm:px-2" title={trip.tripNo}>{trip.tripNo}</td>
+                                  <td className="max-w-0 truncate px-1.5 py-2 text-slate-700 sm:px-2">{new Date(trip.date).toLocaleDateString('en-IN')}</td>
+                                  <td className="max-w-0 truncate px-1.5 py-2 text-slate-700 sm:px-2" title={trip.fromLocation}>{trip.fromLocation}</td>
+                                  <td className="max-w-0 truncate px-1.5 py-2 text-slate-700 sm:px-2" title={trip.toLocation}>{trip.toLocation}</td>
+                                  <td className="max-w-0 truncate px-1.5 py-2 text-slate-700 sm:px-2" title={trip.vehicleNumber}>{trip.vehicleNumber}</td>
+                                  <td className="max-w-0 truncate px-1.5 py-2 text-slate-700 sm:px-2">{trip.grLrNo || '—'}</td>
+                                  <td className="max-w-0 truncate px-1.5 py-2 text-right tabular-nums text-slate-900 sm:px-2">
                                     ₹{(getTripAmount(trip) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                   </td>
-                                  <td className="px-2 py-2 text-right tabular-nums text-slate-900">
+                                  <td className="max-w-0 truncate px-1.5 py-2 text-right tabular-nums text-slate-900 sm:px-2">
                                     ₹{(getTripExpenseAmount(trip) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                   </td>
                                 </tr>
@@ -1989,45 +2165,63 @@ export default function InvoiceManagement() {
                       {(invoiceMrSummary[inv.id] || []).length === 0 ? (
                         <p className="text-sm text-slate-500">No money receipts linked yet.</p>
                       ) : (
-                        <div className="table-scroll-bleed overflow-x-auto rounded border border-slate-200">
-                          <table className="w-full min-w-[720px] text-sm">
+                        <div className="table-scroll-bleed rounded border border-slate-200">
+                          <table className="w-full min-w-0 table-fixed border-collapse text-[11px] sm:text-sm">
                             <thead className="bg-slate-50">
                               <tr className="border-b border-slate-200 text-left">
-                                <th className="px-2 py-2 font-medium text-slate-700">MR no.</th>
-                                <th className="px-2 py-2 font-medium text-slate-700">MR date</th>
-                                <th className="px-2 py-2 text-right font-medium text-slate-700">Received</th>
-                                <th className="px-2 py-2 text-right font-medium text-slate-700">TDS</th>
-                                <th className="px-2 py-2 text-right font-medium text-slate-700">TDS %</th>
-                                <th className="px-2 py-2 text-right font-medium text-slate-700">Deduction</th>
-                                <th className="px-2 py-2 text-right font-medium text-slate-700">Download</th>
+                                <th className="w-[18%] px-1.5 py-2 font-medium text-slate-700 sm:px-2">MR no.</th>
+                                <th className="w-[12%] px-1.5 py-2 font-medium text-slate-700 sm:px-2">MR date</th>
+                                <th className="w-[14%] px-1.5 py-2 text-right font-medium text-slate-700 sm:px-2">Received</th>
+                                <th className="w-[12%] px-1.5 py-2 text-right font-medium text-slate-700 sm:px-2">TDS</th>
+                                <th className="w-[10%] px-1.5 py-2 text-right font-medium text-slate-700 sm:px-2">TDS %</th>
+                                <th className="w-[14%] px-1.5 py-2 text-right font-medium text-slate-700 sm:px-2">Deduction</th>
+                                <th className="w-[20%] px-1.5 py-2 text-right font-medium text-slate-700 sm:px-2">PDF</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 bg-white">
                               {(invoiceMrSummary[inv.id] || []).map((mr) => (
                                 <tr key={mr.id}>
-                                  <td className="px-2 py-2 font-mono text-xs text-slate-900">{mr.receiptNo}</td>
-                                  <td className="px-2 py-2 text-slate-700">
+                                  <td className="max-w-0 truncate px-1.5 py-2 font-mono text-[10px] text-slate-900 sm:px-2 sm:text-xs">{mr.receiptNo}</td>
+                                  <td className="max-w-0 truncate px-1.5 py-2 text-[10px] text-slate-700 sm:px-2 sm:text-sm">
                                     {mr.paymentDate ? new Date(mr.paymentDate).toLocaleDateString('en-IN') : '—'}
                                   </td>
-                                  <td className="px-2 py-2 text-right tabular-nums text-slate-900">₹{mr.receivedAmount.toFixed(2)}</td>
-                                  <td className="px-2 py-2 text-right tabular-nums text-slate-900">₹{mr.tdsAmount.toFixed(2)}</td>
-                                  <td className="px-2 py-2 text-right tabular-nums text-slate-900">{mr.tdsPercent}%</td>
-                                  <td className="px-2 py-2 text-right tabular-nums text-slate-900">₹{mr.deductionAmount.toFixed(2)}</td>
-                                  <td className="px-2 py-2 text-right">
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      className="h-8 rounded-md px-2"
-                                      disabled={downloadingMr === `${inv.id}:${mr.id}`}
-                                      onClick={() => handleDownloadMoneyReceipt(inv.id, mr.id, mr.receiptNo)}
-                                    >
-                                      {downloadingMr === `${inv.id}:${mr.id}` ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : (
-                                        <Download className="h-4 w-4" />
-                                      )}
-                                    </Button>
+                                  <td className="max-w-0 truncate px-1.5 py-2 text-right text-[10px] tabular-nums text-slate-900 sm:px-2 sm:text-sm">₹{mr.receivedAmount.toFixed(2)}</td>
+                                  <td className="max-w-0 truncate px-1.5 py-2 text-right text-[10px] tabular-nums text-slate-900 sm:px-2 sm:text-sm">₹{mr.tdsAmount.toFixed(2)}</td>
+                                  <td className="max-w-0 truncate px-1.5 py-2 text-right text-[10px] tabular-nums text-slate-900 sm:px-2 sm:text-sm">{mr.tdsPercent}%</td>
+                                  <td className="max-w-0 truncate px-1.5 py-2 text-right text-[10px] tabular-nums text-slate-900 sm:px-2 sm:text-sm">₹{mr.deductionAmount.toFixed(2)}</td>
+                                  <td className="px-1 py-2 text-right sm:px-2">
+                                    <div className="flex flex-wrap justify-end gap-0.5 sm:gap-1">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 rounded-md px-1.5 sm:h-8 sm:px-2"
+                                        title="Preview PDF"
+                                        disabled={downloadingMr === `${inv.id}:${mr.id}`}
+                                        onClick={() => handlePreviewMoneyReceipt(inv.id, mr.id)}
+                                      >
+                                        {downloadingMr === `${inv.id}:${mr.id}` ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <Eye className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 rounded-md px-1.5 sm:h-8 sm:px-2"
+                                        title="Download PDF"
+                                        disabled={downloadingMr === `${inv.id}:${mr.id}`}
+                                        onClick={() => handleDownloadMoneyReceipt(inv.id, mr.id, mr.receiptNo)}
+                                      >
+                                        {downloadingMr === `${inv.id}:${mr.id}` ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <Download className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                    </div>
                                   </td>
                                 </tr>
                               ))}
