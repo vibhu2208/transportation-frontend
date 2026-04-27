@@ -52,6 +52,10 @@ export interface CreatePartyBranchRequest {
   locationLabel?: string;
   gstIn?: string;
   address?: string;
+  openingType?: 'debit' | 'credit';
+  openingAmount?: number;
+  openingDate?: string;
+  openingDescription?: string;
 }
 
 export interface PartyDetailInvoiceRow {
@@ -145,4 +149,46 @@ export interface PartyDetailResponse {
   invoices: PartyDetailInvoiceRow[];
   goodsReceipts: PartyDetailGrRow[];
   moneyReceipts: PartyDetailMoneyReceiptRow[];
+}
+
+export interface PartyLedgerSummary {
+  ledgerId: string;
+  openingBalanceValue: string;
+  openingBalanceDirection: 'Dr' | 'Cr';
+  openingBalanceLabel: string;
+  currentBalanceValue: string;
+  currentBalanceDirection: 'Dr' | 'Cr';
+  currentBalanceLabel: string;
+  lastTransactionDate: string | null;
+}
+
+export interface PartyLedgerRow {
+  id: string;
+  txnDate: string;
+  type: 'OPENING_BALANCE' | 'INVOICE' | 'PAYMENT_RECEIVED' | 'CREDIT_NOTE' | 'DEBIT_NOTE';
+  docType: 'MANUAL_OPENING' | 'INVOICE' | 'MONEY_RECEIPT' | 'CREDIT_NOTE' | 'DEBIT_NOTE';
+  referenceNo: string | null;
+  description: string | null;
+  debit: string;
+  credit: string;
+  runningBalanceValue: string;
+  runningBalanceDirection: 'Dr' | 'Cr';
+  runningBalanceLabel: string;
+}
+
+export interface PartyLedgerStatement {
+  ledgerId: string;
+  partyId: string;
+  partyBranchId: string;
+  page: number;
+  limit: number;
+  totalRows: number;
+  totals: {
+    totalDebit: string;
+    totalCredit: string;
+    closingBalanceValue: string;
+    closingBalanceDirection: 'Dr' | 'Cr';
+    closingBalanceLabel: string;
+  };
+  rows: PartyLedgerRow[];
 }

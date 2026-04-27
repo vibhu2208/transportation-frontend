@@ -6,6 +6,8 @@ import {
   Party,
   PartyDetailResponse,
   PartyBranch,
+  PartyLedgerStatement,
+  PartyLedgerSummary,
 } from './types';
 
 export const partiesApi = {
@@ -53,6 +55,68 @@ export const partiesApi = {
 
   async syncParties(): Promise<Party[]> {
     const response = await api.post('/parties/sync');
+    return response.data;
+  },
+
+  async createPartyLedger(data: {
+    partyId: string;
+    partyBranchId: string;
+    openingDate: string;
+    openingType: 'debit' | 'credit';
+    amount: number;
+    description?: string;
+  }): Promise<{
+    ledgerId: string;
+    partyId: string;
+    partyBranchId: string;
+    openingEntryId: string;
+    openingBalance: { value: string; direction: 'Dr' | 'Cr'; formatted: string };
+  }> {
+    const response = await api.post('/party-ledgers', data);
+    return response.data;
+  },
+
+  async createPartyLedgerEntry(
+    ledgerId: string,
+    data: {
+      type: 'credit_note' | 'debit_note';
+      txnDate: string;
+      noteNo: string;
+      amount: number;
+      description?: string;
+    },
+  ) {
+    const response = await api.post(`/party-ledgers/${ledgerId}/entries`, data);
+    return response.data;
+  },
+
+  async getPartyLedgerSummary(partyId: string, partyBranchId: string): Promise<PartyLedgerSummary> {
+    const response = await api.get('/party-ledgers/summary', { params: { partyId, partyBranchId } });
+    return response.data;
+  },
+
+  async getPartyLedgerStatement(params: {
+    partyId: string;
+    partyBranchId: string;
+    from?: string;
+    to?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<PartyLedgerStatement> {
+    const response = await api.get('/party-ledgers/statement', { params });
+    return response.data;
+  },
+
+  async downloadPartyLedgerStatementPdf(params: {
+    partyId: string;
+    partyBranchId: string;
+    from?: string;
+    to?: string;
+  }): Promise<Blob> {
+    const response = await api.get('/party-ledgers/statement/download', {
+      params,
+      responseType: 'blob',
+    });
     return response.data;
   },
 };
