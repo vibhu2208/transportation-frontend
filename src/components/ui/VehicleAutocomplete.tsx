@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, X, ChevronDown } from 'lucide-react';
-import axios from 'axios';
+import { api } from '@/lib/api';
 
 interface Vehicle {
   id: string;
@@ -47,16 +47,12 @@ export function VehicleAutocomplete({
 
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('auth_token');
-      const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/vehicles/search`,
-        {
-          params: { q: query, limit: 10 },
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      
-      setSuggestions(response.data || []);
+      const response = await api.get<Vehicle[] | { data?: Vehicle[] }>('/vehicles/search', {
+        params: { q: query, limit: 10 },
+      });
+      const payload = response.data;
+      const nextSuggestions = Array.isArray(payload) ? payload : payload?.data ?? [];
+      setSuggestions(nextSuggestions);
       setIsOpen(true);
       setSelectedIndex(-1);
     } catch (error) {

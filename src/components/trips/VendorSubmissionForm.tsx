@@ -220,10 +220,26 @@ export function VendorSubmissionForm({
         setIsLoading(false);
         return;
       }
-      const payload: Record<string, unknown> = { ...data };
-      if (!data.partyBranchId?.trim()) {
-        delete payload.partyBranchId;
+
+      const payload: Record<string, unknown> = {
+        date: data.date,
+        partyName: data.partyName.trim(),
+        fromLocation: data.fromLocation.trim(),
+        toLocation: data.toLocation.trim(),
+        vehicleNumber: data.vehicleNumber.trim(),
+      };
+      if (data.remarks?.trim()) payload.remarks = data.remarks.trim();
+      if (data.ewayBillNumber?.trim()) payload.ewayBillNumber = data.ewayBillNumber.trim();
+      if (data.ewayDate?.trim()) payload.ewayDate = data.ewayDate;
+      if (typeof data.initialExpense === 'number' && !Number.isNaN(data.initialExpense)) {
+        payload.initialExpense = data.initialExpense;
       }
+      if (typeof data.freight === 'number' && !Number.isNaN(data.freight)) {
+        payload.freight = data.freight;
+      }
+      const branchId = data.partyBranchId?.trim();
+      if (branchId) payload.partyBranchId = branchId;
+
       if (forAdmin) {
         const fallbackVendor =
           defaultVendor?.id || vendors.find((v) => v.name.trim().toLowerCase() === 'test transport vendor')?.id;
@@ -233,8 +249,8 @@ export function VendorSubmissionForm({
         }
         payload.vendorId = fallbackVendor;
       }
-      if (!isMarketParty) {
-        delete payload.advance;
+      if (isMarketParty && typeof data.advance === 'number' && !Number.isNaN(data.advance)) {
+        payload.advance = data.advance;
       }
       if (!forAdmin) {
         delete payload.vendorId;
