@@ -10,18 +10,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Setup Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Login to Docker Hub
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # Build & Push Frontend Image
       - name: Build & Push Frontend Image
         uses: docker/build-push-action@v5
         with:
@@ -29,6 +33,7 @@ jobs:
           push: true
           tags: 0980943898/frontend:latest
 
+      # Deploy to EC2
       - name: Deploy Frontend to EC2
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -37,7 +42,26 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           script: |
+            set -e
+
             cd /opt/transportion
-            docker compose pull frontend
-            docker compose up -d frontend
+
+            echo "Docker login..."
+            docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+
+            echo "Pulling latest frontend image..."
+            docker-compose pull frontend
+
+            echo "Removing old frontend container..."
+            docker rm -f transportion-frontend || true
+
+            echo "Removing stuck recreate container if exists..."
+            docker ps -a | grep transportion-frontend | awk '{print $1}' | xargs -r docker rm -f || true
+
+            echo "Starting frontend..."
+            docker-compose up -d --no-deps frontend
+
+            echo "Cleaning unused images..."
             docker image prune -af
+
+            echo "Frontend deployed successfully "
