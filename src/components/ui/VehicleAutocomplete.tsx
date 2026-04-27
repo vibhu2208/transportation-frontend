@@ -36,6 +36,7 @@ export function VehicleAutocomplete({
   const listRef = useRef<HTMLUListElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<NodeJS.Timeout>();
+  const latestRequestIdRef = useRef(0);
 
   // Debounced search function
   const debouncedSearch = useCallback(async (query: string) => {
@@ -45,21 +46,26 @@ export function VehicleAutocomplete({
       return;
     }
 
+    const requestId = ++latestRequestIdRef.current;
     setIsLoading(true);
     try {
       const response = await api.get<Vehicle[] | { data?: Vehicle[] }>('/vehicles/search', {
         params: { q: query, limit: 10 },
       });
+      if (requestId !== latestRequestIdRef.current) return;
       const payload = response.data;
       const nextSuggestions = Array.isArray(payload) ? payload : payload?.data ?? [];
       setSuggestions(nextSuggestions);
       setIsOpen(true);
       setSelectedIndex(-1);
     } catch (error) {
+      if (requestId !== latestRequestIdRef.current) return;
       console.error('Failed to search vehicles:', error);
       setSuggestions([]);
     } finally {
-      setIsLoading(false);
+      if (requestId === latestRequestIdRef.current) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
