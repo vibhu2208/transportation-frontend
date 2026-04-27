@@ -9,10 +9,10 @@ import { Input } from '@/components/ui/Input';
 import { VehicleAutocomplete } from '@/components/ui/VehicleAutocomplete';
 import ImageUpload from '@/components/ui/ImageUpload';
 import toast from 'react-hot-toast';
-import axios from 'axios';
 import { partiesApi } from '@/modules/parties/api';
 import { GR_INVOICE_UI_UNLOCK_PASSCODE } from '@/lib/gr-invoice-ui-lock';
 import { GrInvoiceUnlockOverlay } from '@/components/trips/GrInvoiceUnlockOverlay';
+import { api } from '@/lib/api';
 
 interface GREditModalProps {
   trip: any;
@@ -378,10 +378,7 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
   useEffect(() => {
     const loadBranches = async () => {
       try {
-        const token = localStorage.getItem('auth_token');
-        if (!token) return;
-        const headers = { Authorization: `Bearer ${token}` };
-        const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/branches`, { headers });
+        const response = await api.get('/branches');
         const loadedBranches = response.data || [];
         setBranches(loadedBranches);
 
@@ -393,11 +390,7 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
           setBranchInput(defaultGhaziabad.name);
         } else if (!existingGR) {
           // Ensure branchId is valid by creating Ghaziabad if not present.
-          const created = await axios.post(
-            `${process.env.NEXT_PUBLIC_API_URL}/branches`,
-            { name: 'Ghaziabad' },
-            { headers },
-          );
+          const created = await api.post('/branches', { name: 'Ghaziabad' });
           setBranches((prev) => {
             const exists = prev.some((b) => b.id === created.data.id);
             if (exists) return prev;
@@ -417,13 +410,10 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
   useEffect(() => {
     const loadFieldOptions = async () => {
       try {
-        const token = localStorage.getItem('auth_token');
-        if (!token) return;
-        const headers = { Authorization: `Bearer ${token}` };
         const [billedRes, cnTypeRes, deliveryRes] = await Promise.all([
-          axios.get(`${process.env.NEXT_PUBLIC_API_URL}/goods-receipt/options/billedAtBranch`, { headers }),
-          axios.get(`${process.env.NEXT_PUBLIC_API_URL}/goods-receipt/options/cnType`, { headers }),
-          axios.get(`${process.env.NEXT_PUBLIC_API_URL}/goods-receipt/options/deliveryAt`, { headers }),
+          api.get('/goods-receipt/options/billedAtBranch'),
+          api.get('/goods-receipt/options/cnType'),
+          api.get('/goods-receipt/options/deliveryAt'),
         ]);
         setFieldOptions({
           billedAtBranch: billedRes.data || [],
@@ -654,13 +644,7 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
     if (!cleaned) return;
     setAddingField((prev) => ({ ...prev, [fieldName]: true }));
     try {
-      const token = localStorage.getItem('auth_token');
-      if (!token) throw new Error('Authentication required');
-      const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/goods-receipt/options`,
-        { fieldName, value: cleaned },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
+      const response = await api.post('/goods-receipt/options', { fieldName, value: cleaned });
       const option = response.data;
       setFieldOptions((prev) => {
         const exists = (prev[fieldName] || []).some((o) => o.value.toLowerCase() === option.value.toLowerCase());
@@ -725,13 +709,7 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
     if (!name) return;
     setIsAddingBranch(true);
     try {
-      const token = localStorage.getItem('auth_token');
-      if (!token) throw new Error('Authentication required');
-      const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/branches`,
-        { name },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
+      const response = await api.post('/branches', { name });
       const created = response.data;
       setBranches((prev) => {
         const exists = prev.some((b) => b.id === created.id);
@@ -842,18 +820,13 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
         return acc;
       }, {});
 
-      const headers = { Authorization: `Bearer ${token}` };
       let savedGr: any = null;
       if (isEditing) {
-        const response = await axios.patch(
-          `${process.env.NEXT_PUBLIC_API_URL}/goods-receipt/${existingGR.id}`,
-          cleanedPayload,
-          { headers },
-        );
+        const response = await api.patch(`/goods-receipt/${existingGR.id}`, cleanedPayload);
         savedGr = response?.data;
         toast.success('GR details updated successfully');
       } else {
-        const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/goods-receipt`, cleanedPayload, { headers });
+        const response = await api.post('/goods-receipt', cleanedPayload);
         savedGr = response?.data;
         toast.success('GR details added successfully');
       }
@@ -863,14 +836,10 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
         const ewayRaw = (data.ewayDate || '').trim();
         const ewayDay = ewayRaw ? toIsoDate(ewayRaw) : '';
         try {
-          await axios.patch(
-            `${process.env.NEXT_PUBLIC_API_URL}/trips/${trip.id}/accounts`,
-            {
-              ewayBillNumber: bill || null,
-              ewayDate: ewayDay || null,
-            },
-            { headers },
-          );
+          await api.patch(`/trips/${trip.id}/accounts`, {
+            ewayBillNumber: bill || null,
+            ewayDate: ewayDay || null,
+          });
         } catch {
           toast.error('GR saved, but e-way could not be updated on the trip.');
         }
@@ -900,13 +869,7 @@ export function GREditModal({ trip, existingGR, onSave, onCancel, onBack }: GREd
     }
     setIsUploadingPOD(true);
     try {
-      const token = localStorage.getItem('auth_token');
-      const headers = { Authorization: `Bearer ${token}` };
-      await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/goods-receipt/${existingGR.id}/pod`,
-        { podImages },
-        { headers },
-      );
+      await api.post(`/goods-receipt/${existingGR.id}/pod`, { podImages });
       toast.success('POD uploaded successfully');
       await onSave();
     } catch (error: any) {
