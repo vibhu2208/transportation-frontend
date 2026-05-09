@@ -50,7 +50,7 @@ jobs:
             docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
 
             echo "Pulling latest frontend image..."
-            docker-compose pull frontend
+            docker compose pull frontend
 
             echo "Removing old frontend container..."
             docker rm -f transportion-frontend || true
@@ -59,7 +59,7 @@ jobs:
             docker ps -a | grep transportion-frontend | awk '{print $1}' | xargs -r docker rm -f || true
 
             echo "Starting frontend..."
-            docker-compose up -d --no-deps frontend
+            docker compose up -d --no-deps frontend
 
             echo "Cleaning unused images..."
             docker image prune -af
